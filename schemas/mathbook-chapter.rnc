@@ -1,0 +1,4 @@
+
+include "mathbook-common.rnc"
+
+start = frontmatter | chapter | part | backmatter

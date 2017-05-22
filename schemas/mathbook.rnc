@@ -1,0 +1,4 @@
+
+include "mathbook-common.rnc"
+
+start = mathbook

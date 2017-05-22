@@ -1,0 +1,1645 @@
+# *********************************************************************
+# Copyright 2016
+# Robert A. Beezer
+#
+# This file is part of MathBook XML.
+#
+# MathBook XML is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 or version 3 of the
+# License (at your option).
+#
+# MathBook XML is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with MathBook XML.  If not, see <http://www.gnu.org/licenses/>.
+# *********************************************************************
+# #####################################################################
+# 2016-01-27:     This is PRELIMINARY and SUBJECT TO CHANGE.
+# It is only here for safe-keeping, even if it is close to complete.
+# #####################################################################
+# http://www.sagehill.net/docbookxsl/ValidXinclude.html
+# * = zero or more, + = one or more, ? = zero or one
+# #PCDATA *must* be used inside of (  )* as first part, can augment
+# http://stackoverflow.com/questions/2803142/why-is-this-not-a-valid-xml-dtd-parameter-entity-and-pcdata
+
+# ####################
+# Convenience Entities
+# ####################
+
+# Titles, Captions and simple text
+# Elements that could be inside a single line of text
+# For example, an <ndash>, but not a <me>
+# Precede these by a #PCDATA, wrap with ( )*
+
+characters =
+  nbsp
+  | ndash
+  | mdash
+  | ampersand
+  | less
+  | greater
+  | hash
+  | dollar
+  | percent
+  | circumflex
+  | underscore
+  | lbrace
+  | rbrace
+  | lbracket
+  | rbracket
+  | ldblbracket
+  | rdblbracket
+  | langle
+  | rangle
+  | tilde
+  | backslash
+  | asterisk
+  | lq
+  | rq
+  | lsq
+  | rsq
+  | ellipsis
+  | midpoint
+  | swungdash
+  | permille
+  | pilcrow
+  | section-mark
+  | times
+  | slash
+  | solidus
+  | copyright
+  | ie
+  | eg
+  | etc
+  | circa
+  | tex
+  | latex
+  | webwork
+  | trademark
+  | registered
+  | fillin
+  | today
+  | timeofday
+  | doublesharp
+  | sharp
+  | natural
+  | flat
+  | doubleflat
+markup =
+  xref
+  | url
+  | m
+  | c
+  | em
+  | alert
+  | insert
+  | delete
+  | stale
+  | q
+  | sq
+  | braces
+  | brackets
+  | dblbrackets
+  | angles
+  | term
+  | foreign
+  | abbr
+  | quantity
+  | acro
+  | init
+  | booktitle
+  | n
+  | scaledeg
+  | chord
+linear = characters | markup
+
+# Multiline Content
+# Addresses, attributions, and other content
+# that is not a constituent of a paragraph may
+# be broken into a sequence of line elements.
+# It is not possibble to use this as an alternative
+# to mixed-content, so some uses may be inaccurate.
+# http://stackoverflow.com/questions/12261206/dtd-syntax-allow-sub-element-or-pcdata
+
+line = element line { attlist.line, (text | linear)* }
+attlist.line &= empty
+
+# Sentences, Paragraph Content
+# Elements that can be contained in a typical paragraph
+# Everything that is title material, plus more (eg me)
+# var is exclusive to "p" in a WeBWorK problem
+listitem =
+  linear | me | men | md | mdn | cd | fn | index | notation | var
+sentence = listitem | ul | ol | dl
+
+# Paragraphs
+# Elements that can mix anywhere with a paragraph,
+# such as in the statement of a theorem or a proof
+# For example <figure> yes, but <theorem> no
+para =
+  p
+  | blockquote
+  | pre
+  | sidebyside
+  | sbsgroup # JDR
+  | sage
+  | figure
+  | table
+  | listing
+  | poem
+  | program
+  | console
+  | image
+  | tabular
+
+# Blocks
+# Top-level descendents of structural elements
+# Everything like a paragraph, but also more substantial
+# These items cannot be contained in anything but a structural subdivision
+# Note: the "todo" element is in this list
+# DEFINITION-LIKE definition
+# THEOREM-LIKE theorem|corollary|lemma|algorithm|proposition|claim|fact|identity
+# AXIOM-LIKE   axiom|conjecture|principle|heuristic|hypothesis|assumption
+# REMARK-LIKE remark|convention|note|observation|warning|insight|computation|technology
+# ASIDE-LIKE aside|biographical|historical
+# EXAMPLE-LIKE example|question|problem
+# PROJECT-LIKE project|activity|exploration|task|investigation
+
+block =
+  para
+  | paragraphs
+  | definition
+  | theorem
+  | corollary
+  | lemma
+  | algorithm
+  | proposition
+  | claim
+  | fact
+  | identity
+  | axiom
+  | conjecture
+  | principle
+  | heuristic
+  | hypothesis
+  | assumption
+  | remark
+  | convention
+  | note
+  | observation
+  | warning
+  | insight
+  | computation
+  | technology
+  | aside
+  | biographical
+  | historical
+  | \list
+  | example
+  | question
+  | problem
+  | project
+  | activity
+  | exploration
+  | task
+  | investigation
+  | assemblage
+  | exercise
+  | contributors
+  | list-of
+  | solution-list
+  | notation  # JDR
+  | notation-list
+  | demonstration # JDR
+  | proof # JDR
+  | todo
+
+# #########
+# Structure
+# #########
+
+mathbook =
+  element mathbook { attlist.mathbook, docinfo, (book | article) }
+attlist.mathbook &= attribute xml:lang { text }?
+attlist.mathbook &= attribute xml:base { text }?
+
+# A book may be a list of chapters or a list of parts
+book =
+  element book {
+    attlist.book,
+    title,
+    subtitle?,
+    frontmatter,
+    ((chapter+, backmatter?) | (part+, backmatter?))
+  }
+attlist.book &= attribute xml:id { xsd:ID }?
+attlist.book &= attribute xml:base { text }?
+
+# TODO: need a super-lightweight article (no sections, just blocks)
+article =
+  element article {
+    attlist.article,
+    title,
+    subtitle?,
+    frontmatter?,
+    (section | exercises | references)+,
+    backmatter?
+  }
+attlist.article &= attribute xml:id { xsd:ID }?
+attlist.article &= attribute xml:base { text }?
+
+part =
+  element part { attlist.part, title, index*, objectives?, chapter+ }
+attlist.part &= attribute xml:id { xsd:ID }?
+attlist.part &= attribute xml:base { text }?
+
+chapter =
+  element chapter {
+    attlist.chapter,
+    title,
+    index*,
+    author*,
+    objectives?,
+    ((block | references | exercises)*
+     | (introduction?,
+        section,
+        (section | references | exercises)*,
+        conclusion?))
+  }
+attlist.chapter &= attribute xml:id { xsd:ID }?
+attlist.chapter &= attribute xml:base { text }?
+
+section =
+  element section {
+    attlist.section,
+    title,
+    index*,
+    author*,
+    objectives?,
+    ((block | references | exercises)*
+     | (introduction?,
+        subsection,
+        (subsection | references | exercises)*,
+        conclusion?))
+  }
+attlist.section &= attribute xml:id { xsd:ID }?
+attlist.section &= attribute xml:base { text }?
+
+subsection =
+  element subsection {
+    attlist.subsection,
+    title,
+    index*,
+    author*,
+    objectives?,
+    ((block | references | exercises)*
+     | (introduction?,
+        subsubsection,
+        (subsubsection | references | exercises)*,
+        conclusion?))
+  }
+attlist.subsection &= attribute xml:id { xsd:ID }?
+attlist.subsection &= attribute xml:base { text }?
+
+subsubsection =
+  element subsubsection {
+    attlist.subsubsection, title, index*, author*, objectives?, block*
+  }
+attlist.subsubsection &= attribute xml:id { xsd:ID }?
+attlist.subsubsection &= attribute xml:base { text }?
+
+title = element title { attlist.title, (text | linear)* }
+attlist.title &= empty
+subtitle = element subtitle { attlist.subtitle, (text | linear)* }
+attlist.subtitle &= empty
+
+objectives =
+  element objectives {
+    attlist.objectives,
+    title?,
+    index*,
+    introduction?,
+    (ul | ol | dl),
+    conclusion?
+  }
+attlist.objectives &= attribute xml:id { xsd:ID }?
+
+introduction =
+  element introduction { attlist.introduction, title?, index*, block* }
+attlist.introduction &= empty
+
+conclusion =
+  element conclusion { attlist.conclusion, title?, index*, block* }
+attlist.conclusion &= empty
+
+# #####
+# Lists
+# #####
+
+ul = element ul { attlist.ul, li+ }
+attlist.ul &= attribute cols { "2" | "3" | "4" | "5" | "6" }?
+attlist.ul &= attribute label { text }?
+
+ol = element ol { attlist.ol, li+ }
+attlist.ol &= attribute cols { "2" | "3" | "4" | "5" | "6" }?
+attlist.ol &= attribute label { text }?
+
+# Description lists cannot be organized into columns
+dl = element dl { attlist.dl, li+ }
+attlist.dl &= attribute width { "narrow" | "medium" | "wide" }?
+
+# ol/li: %listitem; or structured with elements, no title, xml:id active
+# ul/li: %listitem; or structured with elements, no title, xml:id inactive
+# dl/li: only structured with elements, exactly one title mandatory, xml:id active
+li = element li { attlist.li, (text | title | index | p | listitem)* }
+attlist.li &= attribute xml:id { xsd:ID }?
+
+# ######
+# Blocks
+# ######
+
+p = element p { attlist.p, (text | sentence)* }
+attlist.p &= empty
+
+# As a sidebyside panel, only contains "p|blockquote"
+paragraphs =
+  element paragraphs { attlist.paragraphs, title?, index*, para* }
+attlist.paragraphs &= attribute xml:id { xsd:ID }?
+attlist.paragraphs &= attribute xml:base { text }?
+
+# components of mathematical objects
+statement = element statement { attlist.statement, para* }
+attlist.statement &= empty
+
+proof = element proof { attlist.proof, (para | case)* }
+attlist.proof &= attribute xml:id { xsd:ID }?
+
+case = element case { attlist.case, title?, index*, para* }
+attlist.case &= attribute xml:id { xsd:ID }?
+attlist.case &= attribute direction { "forward" | "backward" }?
+
+# definition might contain notation
+definition =
+  element definition {
+    attlist.definition, title?, index*, notation*, statement
+  }
+attlist.definition &= attribute xml:id { xsd:ID }?
+
+# theorem-like, i.e. with proof
+theorem =
+  element theorem { attlist.theorem, title?, index*, statement, proof* }
+attlist.theorem &= attribute xml:id { xsd:ID }?
+
+corollary =
+  element corollary {
+    attlist.corollary, title?, index*, statement, proof*
+  }
+attlist.corollary &= attribute xml:id { xsd:ID }?
+
+lemma =
+  element lemma { attlist.lemma, title?, index*, statement, proof* }
+attlist.lemma &= attribute xml:id { xsd:ID }?
+
+algorithm =
+  element algorithm {
+    attlist.algorithm, title?, index*, statement, proof*
+  }
+attlist.algorithm &= attribute xml:id { xsd:ID }?
+
+proposition =
+  element proposition {
+    attlist.proposition, title?, index*, statement, proof*
+  }
+attlist.proposition &= attribute xml:id { xsd:ID }?
+
+claim =
+  element claim { attlist.claim, title?, index*, statement, proof* }
+attlist.claim &= attribute xml:id { xsd:ID }?
+
+fact = element fact { attlist.fact, title?, index*, statement, proof* }
+attlist.fact &= attribute xml:id { xsd:ID }?
+
+identity =
+  element identity {
+    attlist.identity, title?, index*, statement, proof*
+  }
+attlist.identity &= attribute xml:id { xsd:ID }?
+
+# axiom-like, i.e. no proof
+axiom = element axiom { attlist.axiom, title?, index*, statement }
+attlist.axiom &= attribute xml:id { xsd:ID }?
+
+conjecture =
+  element conjecture { attlist.conjecture, title?, index*, statement }
+attlist.conjecture &= attribute xml:id { xsd:ID }?
+
+principle =
+  element principle { attlist.principle, title?, index*, statement }
+attlist.principle &= attribute xml:id { xsd:ID }?
+
+heuristic =
+  element heuristic { attlist.heuristic, title?, index*, statement }
+attlist.heuristic &= attribute xml:id { xsd:ID }?
+
+hypothesis =
+  element hypothesis { attlist.hypothesis, title?, index*, statement }
+attlist.hypothesis &= attribute xml:id { xsd:ID }?
+
+assumption =
+  element assumption { attlist.assumption, title?, index*, statement }
+attlist.assumption &= attribute xml:id { xsd:ID }?
+
+# REMARK-LIKE, simple, no detailed structure
+
+# base, xi for conditional Sage remarks in FCLA
+remark = element remark { attlist.remark, title?, index*, para* }
+attlist.remark &= attribute xml:id { xsd:ID }?
+attlist.remark &= attribute xml:base { text }?
+
+convention =
+  element convention { attlist.convention, title?, index*, para* }
+attlist.convention &= attribute xml:id { xsd:ID }?
+
+note = element note { attlist.note, title?, index*, para* }
+attlist.note &= attribute xml:id { xsd:ID }?
+
+observation =
+  element observation { attlist.observation, title?, index*, para* }
+attlist.observation &= attribute xml:id { xsd:ID }?
+
+warning = element warning { attlist.warning, title?, index*, para* }
+attlist.warning &= attribute xml:id { xsd:ID }?
+
+insight = element insight { attlist.insight, title?, index*, para* }
+attlist.insight &= attribute xml:id { xsd:ID }?
+
+computation =
+  element computation { attlist.computation, title?, index*, para* }
+attlist.computation &= attribute xml:id { xsd:ID }?
+
+technology =
+  element technology { attlist.technology, title?, index*, para* }
+attlist.technology &= attribute xml:id { xsd:ID }?
+
+# ASIDE-LIKE, simple, limited structure, title required
+aside = element aside { attlist.aside, title, index*, para* }
+attlist.aside &= attribute xml:id { xsd:ID }?
+
+biographical =
+  element biographical { attlist.biographical, title, index*, para* }
+attlist.biographical &= attribute xml:id { xsd:ID }?
+
+historical =
+  element historical { attlist.historical, title, index*, para* }
+attlist.historical &= attribute xml:id { xsd:ID }?
+
+# EXAMPLE-LIKE, PROJECT-LIKE
+
+# JDR
+demonstration =
+  element demonstration { attlist.demonstration, title, index*, para* }
+attlist.demonstration &= empty
+
+# minimal structure  xor  statement/optional-solutions
+example =
+  element example {
+    attlist.example,
+    title?,
+    index*,
+    (para* | (statement, solution*))
+  }
+attlist.example &= attribute xml:id { xsd:ID }?
+
+question =
+  element question {
+    attlist.question,
+    title?,
+    index*,
+    (para* | (statement, solution*))
+  }
+attlist.question &= attribute xml:id { xsd:ID }?
+
+problem =
+  element problem {
+    attlist.problem,
+    title?,
+    index*,
+    (para* | (statement, solution*))
+  }
+attlist.problem &= attribute xml:id { xsd:ID }?
+
+project =
+  element project {
+    attlist.project,
+    title?,
+    index*,
+    (para* | (statement, solution*))
+  }
+attlist.project &= attribute xml:id { xsd:ID }?
+
+activity =
+  element activity {
+    attlist.activity,
+    title?,
+    index*,
+    (para* | (statement, solution*))
+  }
+attlist.activity &= attribute xml:id { xsd:ID }?
+
+exploration =
+  element exploration {
+    attlist.exploration,
+    title?,
+    index*,
+    (para* | (statement, solution*))
+  }
+attlist.exploration &= attribute xml:id { xsd:ID }?
+
+task =
+  element task {
+    attlist.task,
+    title?,
+    index*,
+    (para* | (statement, solution*))
+  }
+attlist.task &= attribute xml:id { xsd:ID }?
+
+investigation =
+  element investigation {
+    attlist.investigation,
+    title?,
+    index*,
+    (para* | (statement, solution*))
+  }
+attlist.investigation &= attribute xml:id { xsd:ID }?
+
+# a collection or summary, minimal structure, highlighted presentation
+assemblage =
+  element assemblage {
+    attlist.assemblage,
+    title?,
+    index*,
+    (p | table | figure | sidebyside | sbsgroup)+
+  }
+attlist.assemblage &= attribute xml:id { xsd:ID }?
+
+\list =
+  element list {
+    attlist.list,
+    title?,
+    index*,
+    introduction?,
+    (ol | ul | dl),
+    conclusion?
+  }
+attlist.list &= attribute xml:id { xsd:ID }?
+
+blockquote = element blockquote { attlist.blockquote, p+, attribution* }
+attlist.blockquote &= empty
+
+# This is inaccurate, but will allow proper structures to pass
+# Either provide mixed content, or a seqeunce of lines,
+# so the final "or" here should be interpreted as an exclusive-or
+attribution =
+  element attribution { attlist.attribution, (text | linear | line)* }
+attlist.attribution &= empty
+
+# Contributors
+contributors =
+  element contributors { attlist.contributors, contributor* }
+attlist.contributors &= empty
+# contributor near author, editor
+
+# automatic lists, with options
+list-of = element list-of { attlist.list-of, empty }
+# could restrict these, but allow space-delimited
+attlist.list-of &= attribute elements { text }?
+attlist.list-of &= attribute divisions { text }?
+attlist.list-of &= attribute scope { text }?
+attlist.list-of &= attribute empty { "yes" | "no" }?
+# specialized lists, SUBJECT TO CHANGE
+
+# TODO: adjust allowed placements above
+solution-list = element solution-list { attlist.solution-list, empty }
+attlist.solution-list &= empty
+
+notation-list = element notation-list { attlist.notation-list, empty }
+attlist.notation-list &= empty
+
+# ####
+# Code
+# ####
+
+# Generic code chunks, raw text
+prompt = element prompt { attlist.prompt, text }
+attlist.prompt &= empty
+
+input = element input { attlist.input, text }
+attlist.input &= attribute xml:base { text }?
+
+output = element output { attlist.output, text }
+attlist.output &= empty
+
+sage = element sage { attlist.sage, input?, output? }
+attlist.sage &= attribute xml:id { xsd:ID }?
+attlist.sage &= attribute copy { text }?
+attlist.sage &=
+  attribute type { "full" | "display" | "practice" | "invisible" }?
+attlist.sage &=
+  attribute doctest { "random" | "absolute" | "relative" | "not tested" }?
+# TODO: for doctest convert "not tested" to "not-tested"
+attlist.sage &= attribute tolerance { text }?
+# Language options as of 2016-06-13
+attlist.sage &=
+  attribute language {
+    "sage"
+    | "gap"
+    | "gp"
+    | "html"
+    | "maxima"
+    | "octave"
+    | "python"
+    | "r"
+    | "singular"
+  }?
+
+program = element program { attlist.program, input, output? }
+attlist.program &= attribute xml:id { xsd:ID }?
+attlist.program &= attribute language { text }?
+
+console =
+  element console { attlist.console, (prompt?, input, output?)* }
+attlist.console &= empty
+
+# #############
+# Miscellaneous
+# #############
+
+todo = element todo { attlist.todo, text }
+attlist.todo &= empty
+
+notation = element notation { attlist.notation, usage, description }
+attlist.notation &= empty
+
+usage = element usage { attlist.usage, text }
+attlist.usage &= empty
+# description is given for images
+
+# ##################
+# Tables and Figures
+# ##################
+
+# Caption
+caption = element caption { attlist.caption, (text | linear)* }
+attlist.caption &= empty
+
+table =
+  element table { attlist.table, title?, index*, caption?, tabular }
+attlist.table &= attribute xml:id { xsd:ID }?
+attlist.table &= attribute width { text }?
+
+tabular = element tabular { attlist.tabular, col*, row+ }
+attlist.tabular &=
+  attribute bottom { "none" | "minor" | "medium" | "major" }?
+attlist.tabular &=
+  attribute top { "none" | "minor" | "medium" | "major" }?
+attlist.tabular &=
+  attribute left { "none" | "minor" | "medium" | "major" }?
+attlist.tabular &=
+  attribute right { "none" | "minor" | "medium" | "major" }?
+attlist.tabular &=
+  attribute halign { "left" | "center" | "right" | "justify" }?
+attlist.tabular &= attribute valign { "bottom" | "middle" | "top" }?
+
+col = element col { attlist.col, empty }
+attlist.col &= attribute top { "none" | "minor" | "medium" | "major" }?
+attlist.col &=
+  attribute right { "none" | "minor" | "medium" | "major" }?
+attlist.col &=
+  attribute halign { "left" | "center" | "right" | "justify" }?
+attlist.col &= attribute width { text }?
+
+row = element row { attlist.row, cell+ }
+attlist.row &=
+  attribute bottom { "none" | "minor" | "medium" | "major" }?
+attlist.row &= attribute left { "none" | "minor" | "medium" | "major" }?
+attlist.row &=
+  attribute halign { "left" | "center" | "right" | "justify" }?
+attlist.row &= attribute valign { "bottom" | "middle" | "top" }?
+
+cell = element cell { attlist.cell, (text | sentence | p | line)* }
+# Should be (#PCDATA|%sentence;)* xor (p+) xor (line+), but DTD cannot express this
+attlist.cell &=
+  attribute bottom { "none" | "minor" | "medium" | "major" }?
+attlist.cell &=
+  attribute right { "none" | "minor" | "medium" | "major" }?
+attlist.cell &=
+  attribute halign { "left" | "center" | "right" | "justify" }?
+attlist.cell &= attribute colspan { text }?
+
+# Allowing multiple p allows for things like math displays
+figure =
+  element figure {
+    attlist.figure,
+    title?,
+    index*,
+    caption?,
+    # JDR
+    (image | video | latex-image-code | jsxgraph | p*)*
+  }
+attlist.figure &= attribute xml:id { xsd:ID }?
+attlist.figure &= attribute width { text }?
+
+listing =
+  element listing {
+    attlist.listing,
+    title?,
+    index*,
+    caption?,
+    (pre | program | console)*
+  }
+attlist.listing &= attribute xml:id { xsd:ID }?
+attlist.listing &= attribute width { text }?
+
+# ############
+# Side By Side
+# ############
+
+sidebyside =
+  element sidebyside {
+    attlist.sidebyside,
+    caption?,
+    (figure
+     | image
+     | table
+     | tabular
+     | paragraphs
+     | poem  # JDR
+     | p
+     | ol
+     | ul
+     | dl
+     | pre)*
+  }
+attlist.sidebyside &= attribute xml:id { xsd:ID }?
+attlist.sidebyside &= attribute margins { text }?
+attlist.sidebyside &= attribute width { text }?
+attlist.sidebyside &= attribute widths { text }?
+attlist.sidebyside &= attribute valign { "bottom" | "middle" | "top" }?
+attlist.sidebyside &= attribute valigns { text }?
+
+# JDR
+sbsgroup =
+  element sbsgroup {
+    attlist.sidebyside,
+    caption?,
+    sidebyside+
+  }
+
+# ######
+# Poetry
+# ######
+
+poem =
+  element poem {
+    attlist.poem, title?, index*, element author { text }?, (line+ | stanza+)
+  }
+attlist.poem &= attribute width { text }?
+attlist.poem &= attribute xml:id { xsd:ID }?
+
+stanza = element stanza { attlist.stanza, line+ }
+attlist.stanza &= empty
+# line defined above in multline context
+
+# #####
+# Music
+# #####
+
+scaledeg = element scaledeg { attlist.scaledeg, text }
+attlist.scaledeg &= empty
+
+n = element n { attlist.n, empty }
+attlist.n &= attribute pc { text }?
+attlist.n &= attribute acc { text }?
+attlist.n &= attribute octave { text }?
+
+chord = element chord { attlist.chord, alteration* }
+attlist.chord &= attribute root { text }?
+attlist.chord &= attribute mode { text }?
+attlist.chord &= attribute bps { text }?
+attlist.chord &= attribute bass { text }?
+attlist.chord &= attribute suspended { text }?
+attlist.chord &= attribute parentheses { text }?
+
+alteration =
+  element alteration { attlist.alteration, (text | characters)* }
+attlist.alteration &= empty
+
+# ##################
+# Special Characters
+# ##################
+
+# Primarily owing to XML, TeX co-opting these
+nbsp = element nbsp { attlist.nbsp, empty }
+attlist.nbsp &= empty
+ndash = element ndash { attlist.ndash, empty }
+attlist.ndash &= empty
+mdash = element mdash { attlist.mdash, empty }
+attlist.mdash &= empty
+ampersand = element ampersand { attlist.ampersand, empty }
+attlist.ampersand &= empty
+less = element less { attlist.less, empty }
+attlist.less &= empty
+greater = element greater { attlist.greater, empty }
+attlist.greater &= empty
+ellipsis = element ellipsis { attlist.ellipsis, empty }
+attlist.ellipsis &= empty
+hash = element hash { attlist.hash, empty }
+attlist.hash &= empty
+dollar = element dollar { attlist.dollar, empty }
+attlist.dollar &= empty
+percent = element percent { attlist.percent, empty }
+attlist.percent &= empty
+circumflex = element circumflex { attlist.circumflex, empty }
+attlist.circumflex &= empty
+underscore = element underscore { attlist.underscore, empty }
+attlist.underscore &= empty
+lbrace = element lbrace { attlist.lbrace, empty }
+attlist.lbrace &= empty
+rbrace = element rbrace { attlist.rbrace, empty }
+attlist.rbrace &= empty
+lbracket = element lbracket { attlist.lbracket, empty }
+attlist.lbracket &= empty
+rbracket = element rbracket { attlist.rbracket, empty }
+attlist.rbracket &= empty
+ldblbracket = element ldblbracket { attlist.ldblbracket, empty }
+attlist.ldblbracket &= empty
+rdblbracket = element rdblbracket { attlist.rdblbracket, empty }
+attlist.rdblbracket &= empty
+langle = element langle { attlist.langle, empty }
+attlist.langle &= empty
+rangle = element rangle { attlist.rangle, empty }
+attlist.rangle &= empty
+tilde = element tilde { attlist.tilde, empty }
+attlist.tilde &= empty
+backslash = element backslash { attlist.backslash, empty }
+attlist.backslash &= empty
+asterisk = element asterisk { attlist.asterisk, empty }
+attlist.asterisk &= empty
+#  see copyright possibly EMPTY in frontmatter description
+lq = element lq { attlist.lq, empty }
+attlist.lq &= empty
+rq = element rq { attlist.rq, empty }
+attlist.rq &= empty
+lsq = element lsq { attlist.lsq, empty }
+attlist.lsq &= empty
+rsq = element rsq { attlist.rsq, empty }
+attlist.rsq &= empty
+midpoint = element midpoint { attlist.midpoint, empty }
+attlist.midpoint &= empty
+swungdash = element swungdash { attlist.swungdash, empty }
+attlist.swungdash &= empty
+permille = element permille { attlist.permille, empty }
+attlist.permille &= empty
+pilcrow = element pilcrow { attlist.pilcrow, empty }
+attlist.pilcrow &= empty
+section-mark = element section-mark { attlist.section-mark, empty }
+attlist.section-mark &= empty
+times = element times { attlist.times, empty }
+attlist.times &= empty
+slash = element slash { attlist.slash, empty }
+attlist.slash &= empty
+solidus = element solidus { attlist.solidus, empty }
+attlist.solidus &= empty
+# musical symbols
+doublesharp = element doublesharp { attlist.doublesharp, empty }
+attlist.doublesharp &= empty
+sharp = element sharp { attlist.sharp, empty }
+attlist.sharp &= empty
+natural = element natural { attlist.natural, empty }
+attlist.natural &= empty
+flat = element flat { attlist.flat, empty }
+attlist.flat &= empty
+doubleflat = element doubleflat { attlist.doubleflat, empty }
+attlist.doubleflat &= empty
+
+# ############################
+# Abbreviations, Special Terms
+# ############################
+
+ie = element ie { attlist.ie, empty }
+attlist.ie &= empty
+eg = element eg { attlist.eg, empty }
+attlist.eg &= empty
+etc = element etc { attlist.etc, empty }
+attlist.etc &= empty
+circa = element circa { attlist.circa, empty }
+attlist.circa &= empty
+tex = element tex { attlist.tex, empty }
+attlist.tex &= empty
+latex = element latex { attlist.latex, empty }
+attlist.latex &= empty
+# see webwork possibly EMPTY in larger definition
+trademark = element trademark { attlist.trademark, empty }
+attlist.trademark &= empty
+registered = element registered { attlist.registered, empty }
+attlist.registered &= empty
+fillin = element fillin { attlist.fillin, empty }
+attlist.fillin &= attribute characters { text }?
+today = element today { attlist.today, empty }
+attlist.today &= empty
+timeofday = element timeofday { attlist.timeofday, empty }
+attlist.timeofday &= empty
+
+# ####################
+# Simple Inline Markup
+# ####################
+
+em = element em { attlist.em, (text | linear)* }
+attlist.em &= empty
+alert = element alert { attlist.alert, (text | linear)* }
+attlist.alert &= empty
+insert = element insert { attlist.insert, (text | linear)* }
+attlist.insert &= empty
+delete = element delete { attlist.delete, (text | linear)* }
+attlist.delete &= empty
+stale = element stale { attlist.stale, (text | linear)* }
+attlist.stale &= empty
+q = element q { attlist.q, (text | linear)* }
+attlist.q &= empty
+sq = element sq { attlist.sq, (text | linear)* }
+attlist.sq &= empty
+braces = element braces { attlist.braces, (text | linear)* }
+attlist.braces &= empty
+brackets = element brackets { attlist.brackets, (text | linear)* }
+attlist.brackets &= empty
+dblbrackets =
+  element dblbrackets { attlist.dblbrackets, (text | linear)* }
+attlist.dblbrackets &= empty
+angles = element angles { attlist.angles, (text | linear)* }
+attlist.angles &= empty
+term = element term { attlist.term, (text | linear)* }
+attlist.term &= empty
+foreign = element foreign { attlist.foreign, (text | linear)* }
+attlist.foreign &= empty
+abbr = element abbr { attlist.abbr, (text | linear)* }
+attlist.abbr &= empty
+acro = element acro { attlist.acro, (text | linear)* }
+attlist.acro &= empty
+init = element init { attlist.init, (text | linear)* }
+attlist.init &= empty
+fn = element fn { attlist.fn, (text | linear)* }
+attlist.fn &= attribute xml:id { xsd:ID }?
+# PROVISIONAL: I don't like this one, it may go away with better references
+# Using just <title> could be really confusing
+booktitle = element booktitle { attlist.booktitle, (text | linear)* }
+attlist.booktitle &= empty
+
+# #############
+# Verbatim Text
+# #############
+
+# Short snippets
+c = element c { attlist.c, text }
+attlist.c &= attribute latexsep { text }?
+
+# Longer, displayed snippets
+# The | is exclusive-or in practice, DTD cannot express this
+cd = element cd { attlist.cd, (text | cline)* }
+attlist.cd &= empty
+
+# Verbatim, outside paragraphs
+# The | is exclusive-or in practice, DTD cannot express this
+pre = element pre { attlist.pre, (text | cline)* }
+attlist.pre &= empty
+
+# Lines of raw characters
+cline = element cline { attlist.cline, text }
+attlist.cline &= empty
+
+# ################
+# Cross-References
+# ################
+
+# External References
+# This is a bit too lenient since it suggests
+# nesting url's is possible, or that a url can
+# have an xref in the content
+url = element url { attlist.url, (text | linear)* }
+attlist.url &= attribute href { text }?
+
+# Internal Cross-References
+xref = element xref { attlist.xref, (text | linear)* }
+attlist.xref &= attribute provisional { text }?
+attlist.xref &= attribute ref { text }?
+attlist.xref &= attribute detail { text }?
+attlist.xref &= attribute first { text }?
+attlist.xref &= attribute last { text }?
+attlist.xref &= attribute autoname { "yes" | "no" | "title" }?
+
+# Index
+# A mixed-content model is allowed, but DTD will complain
+# JDR: fixed
+index = element index {
+  attlist.index,
+  ((main?, sub*, (see | seealso)?) | (text | linear)*)
+  }
+attlist.index &= attribute xml:id { xsd:ID }?
+attlist.index &= attribute sortby { text }?
+attlist.index &= attribute start { text }?
+attlist.index &= attribute finish { text }?
+
+main = element main { attlist.main, (text | linear)* }
+attlist.main &= attribute sortby { text }?
+
+sub = element sub { attlist.sub, (text | linear)* }
+attlist.sub &= attribute sortby { text }?
+
+see = element see { attlist.see, (text | linear)* }
+attlist.see &= empty
+
+seealso = element seealso { attlist.seealso, (text | linear)* }
+attlist.seealso &= empty
+
+# ####
+# Math
+# ####
+
+# var is allowed only within a webwork problem
+# xref is allowed only on mrows to allow for "reasons"
+# TODO: warn on use of var outside of webwork
+m = element m { attlist.m, (text | var | fillin)* }
+attlist.m &= empty
+
+me = element me { attlist.me, (text | var | fillin)* }
+attlist.me &= empty
+
+men = element men { attlist.men, (text | var | fillin)* }
+attlist.men &= attribute xml:id { xsd:ID }?
+
+md = element md { attlist.md, mrow, (mrow | intertext)* }
+attlist.md &= attribute alignment { "align" | "gather" | "alignat" }?
+attlist.md &= attribute alignat-columns { xsd:integer }?
+attlist.md &= attribute break { "yes" | "no" }?
+
+mdn = element mdn { attlist.mdn, mrow, (mrow | intertext)* }
+attlist.mdn &= attribute alignment { "align" | "gather" | "alignat" }?
+attlist.mdn &= attribute alignat-columns { xsd:integer }?
+attlist.mdn &= attribute break { "yes" | "no" }?
+
+# <xref> may occur in an <mrow> as a "reason"
+mrow = element mrow { attlist.mrow, (text | var | xref | fillin)* }
+attlist.mrow &= attribute xml:id { xsd:ID }?
+attlist.mrow &= attribute number { "yes" | "no" }?
+attlist.mrow &= attribute break { "yes" | "no" }?
+
+# simple text between rows of aligned equations
+intertext = element intertext { attlist.intertext, (text | linear)* }
+attlist.intertext &= empty
+
+# #########
+# Exercises
+# #########
+
+# Inline and sectional
+exercises =
+  element exercises {
+    attlist.exercises,
+    title?,
+    index*,
+    introduction?,
+    (exercise | exercisegroup | todo)*,
+    conclusion?
+  }
+attlist.exercises &= attribute xml:id { xsd:ID }?
+attlist.exercises &= attribute xml:base { text }?
+
+exercisegroup =
+  element exercisegroup {
+    attlist.exercisegroup, introduction?, exercise+, conclusion?
+  }
+attlist.exercisegroup &= attribute xml:id { xsd:ID }?
+attlist.exercisegroup &= attribute cols { "2" | "3" | "4" | "5" | "6" }?
+
+exercise =
+  element exercise {
+    attlist.exercise,
+    title?,
+    index*,
+    ((statement, hint*, answer*, solution*)
+     | (introduction?, webwork, conclusion?))
+  }
+attlist.exercise &= attribute xml:id { xsd:ID }?
+attlist.exercise &= attribute number { text }?
+
+# title, statement described elsewhere
+
+hint = element hint { attlist.hint, para* }
+attlist.hint &= attribute xml:id { xsd:ID }?
+answer = element answer { attlist.answer, para* }
+attlist.answer &= attribute xml:id { xsd:ID }?
+solution = element solution { attlist.solution, para* }
+attlist.solution &= attribute xml:id { xsd:ID }?
+
+# WeBWorK exercises
+# Outer one-or-none provides for empty element
+webwork =
+  element webwork {
+    attlist.webwork,
+    (title?,
+     index*,
+     pg-macros?,
+     setup?,
+     ((statement, hint?, solution?) | stage+))?
+  }
+attlist.webwork &= attribute xml:id { xsd:ID }?
+attlist.webwork &= attribute source { text }?
+attlist.webwork &= attribute seed { text }?
+
+pg-macros = element pg-macros { attlist.pg-macros, macro-file* }
+attlist.pg-macros &= empty
+
+macro-file = element macro-file { attlist.macro-file, text }
+attlist.macro-file &= empty
+
+setup = element setup { attlist.setup, var*, pg-code }
+attlist.setup &= empty
+
+# Multistage problems have the usual lead-in, but then are organized with stages
+stage =
+  element stage { attlist.stage, title?, statement, hint?, solution? }
+attlist.stage &= empty
+
+var = element var { attlist.var, (static? | set?) }
+attlist.var &= attribute name { text }?
+attlist.var &= attribute category { text }?
+attlist.var &= attribute form { text }?
+attlist.var &= attribute evaluator { text }?
+attlist.var &= attribute width { text }?
+
+static = element static { attlist.static, text }
+attlist.static &= empty
+
+set = element set { attlist.set, member+ }
+attlist.set &= empty
+
+member = element member { attlist.member, text }
+attlist.member &= attribute correct { "yes" | "no" }?
+
+pg-code = element pg-code { attlist.pg-code, text }
+attlist.pg-code &= empty
+
+# Video
+video = element video { attlist.video, empty }
+attlist.video &= attribute xml:id { xsd:ID }?
+attlist.video &= attribute width { text }?
+attlist.video &= attribute source { text }?
+attlist.video &= attribute youtube { text }?
+attlist.video &= attribute start { text }?
+attlist.video &= attribute end { text }?
+
+# ######
+# Images
+# ######
+
+# Note: pg-name is exclusive to webwork
+image =
+  element image {
+    attlist.image,
+    description?,
+    (latex-image-code | asymptote | sageplot)?
+  }
+attlist.image &= attribute xml:id { xsd:ID }?
+attlist.image &= attribute xml:base { text }?
+attlist.image &= attribute source { text }?
+attlist.image &= attribute width { text }?
+attlist.image &= attribute pg-name { text }?
+attlist.image &= attribute archive { text }?
+
+# typically for accessibility, also used in notation element
+# var is only active/usable within a webwork problem
+# TODO: warn on var used elsewhere?
+description =
+  element description { attlist.description, (text | linear | var)* }
+attlist.description &= empty
+
+latex-image-code =
+  element latex-image-code { attlist.latex-image-code, text }
+attlist.latex-image-code &= attribute xml:base { text }?
+
+# JDR
+jsxgraph = element jsxgraph { attlist.jsxgraph, input }
+attlist.jsxgraph &= attribute xml:id { xsd:ID }?
+attlist.jsxgraph &= attribute width { text }?
+attlist.jsxgraph &= attribute aspect { text }?
+
+asymptote = element asymptote { attlist.asymptote, text }
+attlist.asymptote &= empty
+
+sageplot = element sageplot { attlist.sageplot, text }
+attlist.sageplot &= empty
+
+# ####################
+# Quantities, SI Units
+# ####################
+
+# Note: prefix and base entities are sunchronized with  xsl/mathbook-units.xsl
+# (Also: It appears impossible to restrict  mag,  exp  to numerical values)
+prefix =
+  "yocto"
+  | "zepto"
+  | "atto"
+  | "femto"
+  | "pico"
+  | "nano"
+  | "micro"
+  | "milli"
+  | "centi"
+  | "deci"
+  | "deca"
+  | "deka"
+  | "hecto"
+  | "kilo"
+  | "mega"
+  | "giga"
+  | "tera"
+  | "peta"
+  | "exa"
+  | "zetta"
+  | "yotta"
+
+base =
+  "ampere"
+  | "candela"
+  | "kelvin"
+  | "gram"
+  | "meter"
+  | "metre"
+  | "mole"
+  | "second"
+  | "becquerel"
+  | "gray"
+  | "sievert"
+  | "degreeCelsius"
+  | "celsius"
+  | "coulomb"
+  | "henry"
+  | "ohm"
+  | "siemens"
+  | "tesla"
+  | "volt"
+  | "weber"
+  | "hertz"
+  | "katal"
+  | "joule"
+  | "newton"
+  | "pascal"
+  | "watt"
+  | "lumen"
+  | "lux"
+  | "radian"
+  | "steradian"
+  | "degree"
+  | "arcminute"
+  | "arcsecond"
+  | "day"
+  | "hour"
+  | "minute"
+  | "hectare"
+  | "liter"
+  | "litre"
+  | "percent"
+  | "degreeFahrenheit"
+  | "fahrenheit"
+  | "pound"
+  | "foot"
+  | "inch"
+  | "yard"
+  | "mile"
+  | "millennium"
+  | "century"
+  | "decade"
+  | "year"
+  | "month"
+  | "week"
+  | "kilometerperhour"
+  | "kilometreperhour"
+  | "mileperhour"
+  | "gallon"
+  | "milepergallon"
+
+quantity = element quantity { attlist.quantity, mag*, unit*, per* }
+attlist.quantity &= empty
+
+mag = element mag { attlist.mag, text }
+attlist.mag &= empty
+
+unit = element unit { attlist.unit, empty }
+attlist.unit &= attribute prefix { prefix }?
+attlist.unit &= attribute base { base }?
+attlist.unit &= attribute exp { text }?
+
+per = element per { attlist.per, empty }
+attlist.per &= attribute prefix { prefix }?
+attlist.per &= attribute base { base }?
+attlist.per &= attribute exp { text }?
+
+# ########
+# Doc Info
+# ########
+
+# A mini-database of relevant information with no natural home
+docinfo =
+  element docinfo {
+    attlist.docinfo,
+    (brandlogo
+     | latex-preamble
+     | macros
+     | latex-image-preamble
+     | initialism
+     | feedback
+     | search
+     | rename)*
+  }
+attlist.docinfo &= attribute xml:base { text }?
+
+# url and image for HTML pages
+brandlogo = element brandlogo { attlist.brandlogo, empty }
+attlist.brandlogo &= attribute url { text }?
+attlist.brandlogo &= attribute source { text }?
+
+# typically for short HTML titles on tabs, bookmarks, etc
+initialism = element initialism { attlist.initialism, text }
+attlist.initialism &= empty
+
+# LaTeX packages, macros, image preamble, as raw data
+latex-preamble =
+  element latex-preamble { attlist.latex-preamble, package* }
+attlist.latex-preamble &= empty
+
+package = element package { attlist.package, text }
+attlist.package &= empty
+
+macros = element macros { attlist.macros, text }
+attlist.macros &= empty
+
+latex-image-preamble =
+  element latex-image-preamble { attlist.latex-image-preamble, text }
+attlist.latex-image-preamble &= empty
+
+# JDR
+search = element search { attlist.search, google }
+attlist.search &= empty
+google = element google { attlist.google, cx }
+attlist.google &= empty
+cx = element cx { attlist.cx, text }
+attlist.cx &= empty
+
+# PROVISIONAL: url specification
+# For default feedback button, URL should really be
+# an attribute since URL element already exists
+feedback = element feedback { attlist.feedback, url }
+attlist.feedback &= empty
+
+# repurpose elements, a change in source
+# TODO:  lang  should be  xml:lang, as on main element?
+rename = element rename { attlist.rename, text }
+attlist.rename &= attribute element { text }?
+attlist.rename &= attribute lang { text }?
+
+# ############
+# Front Matter
+# ############
+
+# There is variation as to what gets employed, across
+# book, article, letter, memo which we try to indicate here
+frontmatter =
+  element frontmatter {
+    attlist.frontmatter,
+    titlepage?,
+    colophon?,
+    biography*,
+    abstract?,
+    dedication?,
+    acknowledgement*,
+    foreword*,
+    preface*
+  }
+attlist.frontmatter &= attribute xml:id { xsd:ID }?
+attlist.frontmatter &= attribute xml:base { text }?
+
+titlepage =
+  element titlepage {
+    attlist.titlepage, author*, editor*, credit*, date?
+  }
+attlist.titlepage &= empty
+
+author =
+  element author {
+    attlist.author, personname, department*, institution*, email*
+  }
+attlist.author &= empty
+
+editor =
+  element editor {
+    attlist.editor, personname, department*, institution*, email*
+  }
+attlist.editor &= empty
+
+contributor =
+  element contributor {
+    attlist.contributor, personname, department*, institution*, email*
+  }
+attlist.contributor &= attribute xml:id { xsd:ID }?
+
+personname =
+  element personname { attlist.personname, (text | characters)* }
+attlist.personname &= empty
+
+department =
+  element department { attlist.department, (text | linear | line)* }
+attlist.department &= empty
+
+institution =
+  element institution { attlist.institution, (text | linear | line)* }
+attlist.institution &= empty
+
+email = element email { attlist.email, text }
+attlist.email &= empty
+
+credit = element credit { attlist.credit, title?, (author | editor)* }
+attlist.credit &= empty
+
+date = element date { attlist.date, (text | characters)* }
+attlist.date &= empty
+
+# both "front" and "back" colophons
+colophon =
+  element colophon {
+    attlist.colophon, title?, edition?, website?, copyright?, p*
+  }
+attlist.colophon &= empty
+
+# front colophon items
+edition = element edition { attlist.edition, text }
+attlist.edition &= empty
+
+website = element website { attlist.website, name, address }
+attlist.website &= empty
+
+name = element name { attlist.name, (text | linear)* }
+attlist.name &= empty
+
+address = element address { attlist.address, text }
+attlist.address &= empty
+
+copyright =
+  element copyright {
+    attlist.copyright, (year, holder, minilicense?, shortlicense?)?
+  }
+attlist.copyright &= empty
+
+year = element year { attlist.year, (text | linear)* }
+attlist.year &= empty
+
+holder = element holder { attlist.holder, (text | linear)* }
+attlist.holder &= empty
+
+minilicense =
+  element minilicense { attlist.minilicense, (text | linear)* }
+attlist.minilicense &= empty
+
+shortlicense =
+  element shortlicense { attlist.shortlicense, (text | linear)* }
+attlist.shortlicense &= empty
+
+biography =
+  element biography { attlist.biography, title?, index*, block* }
+attlist.biography &= attribute xml:id { xsd:ID }?
+
+abstract = element abstract { attlist.abstract, title?, index*, block* }
+attlist.abstract &= attribute xml:id { xsd:ID }?
+
+# The paragraphs of a dedication can be divided
+# with "line", this needs adjustment
+# JDR: fixed
+dedication = element dedication {
+  attlist.dedication,
+  title?,
+  index*,
+  element p { (text | sentence | line)* }*
+  }
+attlist.dedication &= attribute xml:id { xsd:ID }?
+
+acknowledgement =
+  element acknowledgement {
+    attlist.acknowledgement, title?, index*, block*
+  }
+attlist.acknowledgement &= attribute xml:id { xsd:ID }?
+
+foreword =
+  element foreword {
+    attlist.foreword, title?, index*, block*, attribution*
+  }
+attlist.foreword &= attribute xml:id { xsd:ID }?
+
+preface =
+  element preface {
+    attlist.preface, title?, index*, block*, attribution*
+  }
+attlist.preface &= attribute xml:id { xsd:ID }?
+
+# ###########
+# Back Matter
+# ###########
+
+backmatter =
+  element backmatter {
+    attlist.backmatter,
+    title?,
+    appendix*,
+    references?,
+    index-part?,
+    colophon?
+  }
+attlist.backmatter &= attribute xml:id { xsd:ID }?
+attlist.backmatter &= attribute xml:base { text }?
+
+# Appendix is modeled closely on a book/chapter
+# An article/section model may be added
+# Also, various "automatic" lists can go inside an appendix
+appendix =
+  element appendix {
+    attlist.appendix,
+    title?,
+    index*,
+    author*,
+    (block*
+     | (introduction?,
+        (section | exercises | references)*,
+        conclusion?))
+  }
+attlist.appendix &= attribute xml:id { xsd:ID }?
+attlist.appendix &= attribute xml:base { text }?
+
+index-part =
+  element index-part { attlist.index-part, title?, index-list }
+attlist.index-part &= attribute xml:id { xsd:ID }?
+
+# index-list is just a marker to generate the actual index entries
+index-list = element index-list { attlist.index-list, empty }
+attlist.index-list &= empty
+
+# ########################
+# Bibliographic References
+# ########################
+
+# This needs serious work - this is 100% PROVISIONAL
+# As-is, this needs more structure to accomodate note properly
+
+# And  note  is also a remark-like environment
+references =
+  element references {
+    attlist.references,
+    title?,
+    index*,
+    introduction?,
+    biblio*,
+    conclusion?
+  }
+attlist.references &= attribute xml:id { xsd:ID }?
+
+biblio =
+  element biblio {
+    attlist.biblio,
+    (text
+     | linear
+     | ibid
+     | author
+     | title
+     | journal
+     | year
+     | volume
+     | number
+     | note)*
+  }
+attlist.biblio &= attribute xml:id { xsd:ID }?
+attlist.biblio &= attribute type { "raw" }
+
+ibid = element ibid { attlist.ibid, empty }
+attlist.ibid &= empty
+
+# title defined above, could conflict
+journal = element journal { attlist.journal, (text | linear)* }
+attlist.journal &= empty
+
+volume = element volume { attlist.volume, (text | linear)* }
+attlist.volume &= empty
+
+number = element number { attlist.number, (text | linear)* }
+attlist.number &= empty
+
