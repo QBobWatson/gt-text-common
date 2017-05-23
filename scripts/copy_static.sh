@@ -8,7 +8,8 @@ mkdir -p static/js
 mkdir -p static/css
 mkdir -p static/fonts
 
-cp GTcommon/css/mathbook-add-on.css static/css
+cp gt-text-common/css/mathbook-add-on.css static/css
+cp gt-text-common/js/spalign.js static/js
 
 cp lib/mathbook-assets/js/*.js static/js
 cp lib/mathbook-assets/js/lib/*.js static/js
