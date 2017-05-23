@@ -339,8 +339,8 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
             var maxcols = tuple[1];
             var i, align = '';
             for(i = 0; i < maxcols; ++i) {
-                if(i % 2) {align += 'r'}
-                else      {align += 'c'}
+                if(i % 2) {align += 'c'}
+                else      {align += 'r'}
             }
             var envname = "spaligngensys" + star;
             var parsestr
