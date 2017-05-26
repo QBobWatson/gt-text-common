@@ -1,0 +1,67 @@
+
+/* Extra CSS overrides go here */
+
+/* JDR: Fix permalink size (hack) */
+.mathbook-content section header .heading a.permalink {
+  font-size: 11.2px;
+  line-height: 22.8571px;
+}
+
+/* Overrides the overrides in mathbook-add-on.css */
+body, html body {
+    background: #545454;
+}
+
+#masthead.smallbuttons {
+    max-width: 664px;
+    border-right: none;
+    border-left: none;
+    /* border-right: 1px solid #bababa; */
+    /* border-left: 1px solid #bababa; */
+}
+
+.mininav {
+    float: none;
+    padding-top: 0px;
+    overflow: hidden; /* Force baseline = bottom margin */
+    display:table-cell;
+    vertical-align: middle;
+}
+.indexnav {
+    float: none;
+    display:table-cell;
+    overflow: hidden;  /* Force baseline = bottom margin */
+    margin-top: 0px;
+    padding-left: .5em;
+    height: 90%;
+    vertical-align: middle;
+}
+
+#toc h2 + h2 {
+    margin-top: 0px;
+}
+
+article.theorem-like, article.objectives {
+    border-left: 2px solid #eeb211;
+}
+article.theorem-like:after, article.objectives:after {
+    border-bottom: 2px solid #eeb211;
+}
+article.example-like {
+    border-left: 2px solid #eeb211;
+}
+article.example-like:after {
+    border-bottom: 2px solid #eeb211;
+}
+article.definition-like {
+    border-left: 2px solid #eeb211;
+}
+article.definition-like:after {
+    border-bottom: 2px solid #eeb211;
+}
+article.remark-like {
+    border-left: 2px solid #eeb211;
+}
+article.remark-like:after {
+    border-bottom: 2px solid #eeb211;
+}

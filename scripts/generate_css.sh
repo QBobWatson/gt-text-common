@@ -1,14 +1,9 @@
 #!/bin/bash
 
-script_dir=$(dirname "$(realpath $0)")
+realpath=$(realpath "$0")
+script_dir=$(dirname "$realpath")
 cd "$script_dir/../.."
 cd lib/mathbook-assets
 
-cat <<EOF >scss/mathbook-gt.scss
-\$mathbook-primary:#eab72c;
-\$mathbook-primary:darken(\$mathbook-primary, 15%);
-\$mathbook-secondary:#888;
-@import "mathbook";
-EOF
-
 compass compile --time --force
+"$script_dir/copy_static.sh"
