@@ -1,4 +1,0 @@
-
-include "mathbook-common.rnc"
-
-start = section
