@@ -65,3 +65,14 @@ article.remark-like {
 article.remark-like:after {
     border-bottom: 2px solid #eeb211;
 }
+
+.mathbook-content .hidden-knowl-wrapper > a[knowl] > article:after {
+  border: solid black;
+  border-width: 0 3px 3px 0;
+  display: inline-block;
+  padding: 3px;
+  transform: rotate(45deg) translateX(-7px) translateY(5px);
+  -webkit-transform: rotate(45deg) translateX(-7px) translateY(5px);
+  margin-bottom: 2px;
+  margin-left: .5em;
+}
