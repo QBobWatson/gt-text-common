@@ -66,10 +66,6 @@ article.remark-like:after {
     border-bottom: 2px solid #eeb211;
 }
 
-.mathbook-content section > .hidden-knowl-wrapper {
-  margin-bottom: 2em;
-}
-
 .mathbook-content .hidden-knowl-wrapper > a[knowl] > article:after {
   border: solid black;
   border-width: 0 3px 3px 0;
