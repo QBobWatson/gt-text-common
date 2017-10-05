@@ -110,3 +110,7 @@ body, html body {
   text-align: center;
 }
 
+.mathbook-content article.paragraphs .hidden-knowl-wrapper {
+  display: block;
+  margin-bottom: 1em;
+}
