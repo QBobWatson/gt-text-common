@@ -114,3 +114,8 @@ body, html body {
   display: block;
   margin-bottom: 1em;
 }
+
+/* Hide numbers of subsections */
+.mathbook-content .subsection > header > .heading > .codenumber {
+  display: none;
+}
