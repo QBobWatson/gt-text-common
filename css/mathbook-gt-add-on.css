@@ -65,6 +65,13 @@ article.remark-like {
 article.remark-like:after {
     border-bottom: 2px solid #eeb211;
 }
+.paragraphs.remark-like {
+    border-left: 2px solid #eeb211;
+}
+.paragraphs.remark-like:after {
+    border-bottom: 2px solid #eeb211;
+}
+
 
 .mathbook-content .hidden-knowl-wrapper > a[knowl] > article:after {
   border: solid black;
@@ -126,8 +133,9 @@ body, html body {
 
 .mathbook-content .paragraphs.bluebox {
   padding: 1em;
-  padding-bottom: 0;
+  /*padding-bottom: 0;*/
   border: 3px solid #aaaaff;
   border-radius: 8px;
   margin-bottom: 1.25em;
 }
+
