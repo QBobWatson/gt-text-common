@@ -65,6 +65,14 @@ article.remark-like {
 article.remark-like:after {
     border-bottom: 2px solid #eeb211;
 }
+.hidden-knowl-wrapper article.remark-like {
+    border-left: none;
+    padding-left: 0;
+}
+.hidden-knowl-wrapper article.remark-like:after {
+    border-bottom: none;
+    padding-bottom: 0;
+}
 .paragraphs.remark-like {
     border-left: 2px solid #eeb211;
 }
@@ -72,6 +80,17 @@ article.remark-like:after {
     border-bottom: 2px solid #eeb211;
 }
 
+
+a > article.remark-like:after {
+  content:'';
+  display: inline;
+  margin-left: 0;
+  margin-right: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+  border: none;
+}
 
 .mathbook-content .hidden-knowl-wrapper > a[knowl] > article:after {
   border: solid black;
