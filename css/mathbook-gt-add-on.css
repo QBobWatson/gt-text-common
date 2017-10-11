@@ -162,7 +162,7 @@ body, html body {
   width: 2em;
   padding-right: .5em;
   padding-left:  .5em;
-  vertical-align: middle;
+  vertical-align: bottom;
 }
 
 .mathbook-content .heading.important .type,
