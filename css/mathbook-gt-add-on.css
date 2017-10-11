@@ -158,3 +158,14 @@ body, html body {
   margin-bottom: 1.25em;
 }
 
+.mathbook-content .heading img.important {
+  width: 2em;
+  padding-right: .5em;
+  padding-left:  .5em;
+  vertical-align: middle;
+}
+
+.mathbook-content .heading.important .type,
+.mathbook-content .heading.important .codenumber {
+  color: red;
+}
