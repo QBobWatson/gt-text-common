@@ -73,13 +73,6 @@ article.remark-like:after {
     border-bottom: none;
     padding-bottom: 0;
 }
-.paragraphs.remark-like {
-    border-left: 2px solid #eeb211;
-}
-.paragraphs.remark-like:after {
-    border-bottom: 2px solid #eeb211;
-}
-
 
 a > article.remark-like:after {
   content:'';
@@ -91,6 +84,37 @@ a > article.remark-like:after {
   padding: 0;
   border: none;
 }
+
+.mathbook-content .warning-like {
+  padding: 1em;
+  /*padding-bottom: 0;*/
+  border: 3px solid #aaaaff;
+  border-radius: 8px;
+  margin-bottom: 1.25em;
+}
+
+.mathbook-content .warning-like > .heading .type:last-child:after,
+.mathbook-content .warning-like > .heading .codenumber:last-child:after,
+.mathbook-content .warning-like > .heading .title:last-child:after
+{
+  content: ".\2009 ";
+}
+.mathbook-content .warning-like > .heading .type:after,
+.mathbook-content .warning-like > .heading .codenumber:after,
+.mathbook-content .warning-like > .heading .title:after 
+{
+  content: " ";
+}
+
+.mathbook-content .warning-like > .heading {
+  margin: 0;
+  margin-bottom: .5em;
+}
+
+.mathbook-content .warning-like > p:last-child {
+  margin: 0;
+}
+
 
 .mathbook-content .hidden-knowl-wrapper > a[knowl] > article:after {
   border: solid black;
@@ -150,14 +174,6 @@ body, html body {
   font-weight: bold;
 }
 
-.mathbook-content .paragraphs.bluebox {
-  padding: 1em;
-  /*padding-bottom: 0;*/
-  border: 3px solid #aaaaff;
-  border-radius: 8px;
-  margin-bottom: 1.25em;
-}
-
 .mathbook-content .heading img.important {
   width: 1.5em;
   padding-right: .5em;
@@ -169,3 +185,4 @@ body, html body {
 .mathbook-content .heading.important .codenumber {
   color: red;
 }
+
