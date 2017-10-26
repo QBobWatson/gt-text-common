@@ -170,6 +170,14 @@ body, html body {
   display: none;
 }
 
+/* Hide numbers of captions */
+.mathbook-content .figure-like > figcaption > .codenumber {
+  display: none;
+}
+.mathbook-content .figure-like > figcaption > .heading:after {
+  content: ".\2009 ";
+}
+
 .mathbook-content .solution > .type {
   font-weight: bold;
 }
