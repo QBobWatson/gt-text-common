@@ -182,6 +182,13 @@
         });
     }
 
+    // MathJax is now precompiled, but knowl.js doesn't know that.
+    w.MathJax = {Hub: {Queue: function(cmd) {
+        if(cmd[0] instanceof Function) {
+            cmd[0]();
+        }
+    }}};
+
     return Mathbook;
 
 })(jQuery, window);
