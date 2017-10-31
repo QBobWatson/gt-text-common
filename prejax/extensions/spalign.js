@@ -24,7 +24,6 @@ MathJax.Extension["TeX/spalign"] = {
 };
 
 MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
-
     var MML = MathJax.ElementJax.mml;
     var TEX = MathJax.InputJax.TeX;
     var TEXDEF = TEX.Definitions;
@@ -101,7 +100,10 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
      * We cheat a bit here when retokenizing aligned equations by pre-parsing
      * the internal macros \. \+ \= and surrounding odd columns by {}.
      */
-    var retokenize = function(string, aligntab='&', eoltoken='\\\\', syseq=false) {
+    var retokenize = function(string, aligntab, eoltoken, syseq) {
+        if(aligntab === undefined) aligntab = '&';
+        if(eoltoken === undefined) eoltoken = '\\\\';
+        if(syseq    === undefined) syseq    = false;
         var entry, ret = '', tuple, maxcols = 0;
         var row = [];
         while(true) {
@@ -352,7 +354,7 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     });
 
     MathJax.Hub.Startup.signal.Post("TeX spalign Ready");
-
 });
 
-MathJax.Ajax.loadComplete("[Extra]/spalign.js");
+// {{PATH}} replaced by generator script
+MathJax.Ajax.loadComplete("file://{{PATH}}/spalign.js");

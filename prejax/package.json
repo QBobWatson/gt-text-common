@@ -1,0 +1,16 @@
+{
+  "name": "prejax",
+  "version": "1.0.0",
+  "description": "MathJax preprocessor for MathBook XML",
+  "main": "prejax.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Joe Rabinoff",
+  "license": "GPL3",
+  "dependencies": {
+    "cheerio": "1.0.0-rc.2",
+    "mathjax": "2.7.1",
+    "mathjax-node": "1.2.1"
+  }
+}
