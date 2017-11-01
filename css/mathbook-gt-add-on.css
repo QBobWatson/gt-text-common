@@ -125,6 +125,7 @@ a > article.remark-like:after {
   -webkit-transform: translateX(-7px) translateY(-3px) rotate(45deg);
   margin-bottom: 2px;
   margin-left: .5em;
+  content: '';
 }
 
 .mathbook-content .hidden-knowl-wrapper > a[knowl].active > article:after {
@@ -171,11 +172,13 @@ body, html body {
 }
 
 /* Hide numbers of captions */
-.mathbook-content .figure-like > figcaption > .codenumber {
-  display: none;
+.mathbook-content .figure-like > figcaption {
+  font-style: italic;
 }
-.mathbook-content .figure-like > figcaption > .heading:after {
-  content: ".\2009 ";
+.mathbook-content .figure-like > figcaption > .heading,
+.mathbook-content .figure-like > figcaption > .codenumber
+ {
+  display: none;
 }
 
 .mathbook-content .solution > .type {
