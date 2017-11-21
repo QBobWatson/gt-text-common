@@ -65,32 +65,47 @@ LATEX_BEGIN = r'''
 \thispagestyle{empty}%
 '''
 
-LATEX_NEWPAGE = r'\newpage\topskip=0pt%'
+LATEX_NEWPAGE = r'\newpage\topskip=0pt%' + '\n'
 
 LATEX_INLINE = r'''%
 \sbox{{\measurebox}}{{%
 ${code}$%
 }}%
-\usebox\measurebox%
+\vbox to 0pt{{\vss\usebox\measurebox}}%
+\writesize{{inline:{{\the\wd\measurebox}}{{\the\ht\measurebox}}{{\the\dp\measurebox}}}}%
+'''
+
+LATEX_CODE_INLINE = r'''%
+\sbox{{\measurebox}}{{%
+{code}%
+}}%
+\vbox to 0pt{{\vss\usebox\measurebox}}%
 \writesize{{inline:{{\the\wd\measurebox}}{{\the\ht\measurebox}}{{\the\dp\measurebox}}}}%
 '''
 
 # tounicode.py calculates the extents for displayed equations
+# html is 600px wide
 LATEX_DISPLAY = r'''%
 \pdfsavepos\write\boxsize{{prepage:\the\pdflastypos}}
+\begin{{minipage}}{{6.25in}}%
 {code}%
+\end{{minipage}}%
 \writesize{{display:}}%
 '''
 
 PRETEX_STYLE = '''
+.pretex {
+  font-size: 115%;   /* roughly match ex-sizes */
+}
 svg.pretex {
+  display:      inline-block;
   overflow:     visible;
   font-variant: normal;
   font-weight:  normal;
   font-style:   normal;
-  font-size:    106%;   /* looks better */
-  /* hack to adjust spacing */
-  vertical-align: middle;
+}
+.mathbook-content header .pretex {
+  font-size:    106%;   /* roughly match ex-sizes */
 }
 .pretex-display {
   text-align:  center;
@@ -100,14 +115,18 @@ svg.pretex {
   text-transform: none;
   position: relative;
 }
+.pretex-display svg.pretex {
+  /* hack to adjust spacing */
+  vertical-align: middle;
+}
 .pretex-display .tag {
   position:    absolute;
   right:       0;
   top:         0;
-  font-size:   106%;
 }
 .pretex-display .tag > span {
   display: inline-block;
+  font-size: 115%;
 }
 '''
 
@@ -190,22 +209,31 @@ class HTMLDoc:
         pages = []
         for elt in self.dom.find_all(
                 'script', type=re.compile('text/x-latex-.*')):
+            if not elt.string:
+                continue
             code = elt.string.strip()
             if elt['type'] == 'text/x-latex-inline':
                 pages.append(LATEX_INLINE.format(code=code))
-            elif elt['type'] == 'text/x-latex-display':
+                pages.append(LATEX_NEWPAGE)
+            if elt['type'] == 'text/x-latex-code-inline':
+                pages.append(LATEX_CODE_INLINE.format(code=code))
+                pages.append(LATEX_NEWPAGE)
+            elif elt['type'] in ('text/x-latex-display', 'text/x-latex-code'):
                 if code.find(r'\tag') != -1:
                     code = code.replace(r'\tag', r'\postag')
                 pages.append(LATEX_DISPLAY.format(code=code, pageno=len(pages)))
+                pages.append(LATEX_NEWPAGE)
             self.to_replace.append(elt)
-        contents = ''
-        if not self.to_replace:
+        if not pages:
             return False
+        if pages[-1] == LATEX_NEWPAGE:
+            pages = pages[:-1]
+        contents = ''
         with open(self.latex_file, 'w') as fobj:
             fobj.write(LATEX_PREAMBLE)
             fobj.write(self.preamble)
             fobj.write(LATEX_BEGIN)
-            fobj.write(LATEX_NEWPAGE.join(pages))
+            fobj.write(''.join(pages))
             fobj.write(r'\end{document}')
             contents += LATEX_PREAMBLE
             contents += self.preamble
@@ -215,6 +243,7 @@ class HTMLDoc:
         # Now we know the hash file name
         self.html_cache = os.path.join(
             self.cache_dir, md5(contents.encode()).hexdigest())
+        self.contents = contents
         return True
 
     def latex(self):
@@ -223,7 +252,9 @@ class HTMLDoc:
                       '\\input{' + os.path.basename(self.latex_file) + '}'],
                      cwd=self.pdf_dir, stdout=PIPE, stderr=PIPE)
         check_proc(proc, 'Failed to compile LaTeX in {}'.format(
-            self.html_file))
+            self.html_file) + '\n'
+                   + 'Contents of .tex file:\n'
+                   + self.contents)
 
     def read_extents(self):
         "Parse boxsize.txt and populate size data."
@@ -258,7 +289,7 @@ class HTMLDoc:
                     height *= 800/803
                     depth *= 800/803
                     left = 0
-                    top = 0
+                    top = -height
                 else:
                     match = re.match(r'display:(.*),(.*),(.*),(.*)', line)
                     if not match:
@@ -280,8 +311,8 @@ class HTMLDoc:
                     "tags"   : this_tags,
                     # These are used for the "height" and "vertical-align"
                     # properties, which are relative to the current font size.
-                    "heightpt" : height * 803/800,
-                    "depthpt"  : depth  * 803/800,
+                    "heightem" : height * 803/800 / 12,
+                    "depthem"  : depth  * 803/800 / 12,
                     "display"  : typ == 'display',
                 }
                 self.pages_extents.append(page_extents)
@@ -304,33 +335,44 @@ class HTMLDoc:
             self.fonts[name] = fobj.read()
         self.font_hashes[name] = 'f'+md5(self.fonts[name]).hexdigest()[:4]
 
-    def write_cache(self, style, svgs):
+    def write_cache(self, style, fonts, svgs):
         "Cache the computed data"
-        svgs = [str(svg) for svg in svgs]
         cache = {
             'svgs'  : svgs,
             'style' : style,
+            'fonts' : fonts,
         }
         with open(self.html_cache, 'w') as fobj:
             json.dump(cache, fobj)
 
     def use_cached(self, outfile):
         "Write the cached output to the html file."
-        print("Using cached {}".format(outfile))
+        #print("Using cached {}".format(os.path.basename(outfile)))
         with open(self.html_cache) as fobj:
             cache = json.load(fobj)
         # Replace DOM elements
         for i, elt in enumerate(self.to_replace):
-            elt.replace_with(BeautifulSoup(cache['svgs'][i], 'lxml'))
-        self.dom.find(id='mathjax-style').string = cache['style']
+            root = BeautifulSoup(cache['svgs'][i], 'lxml')
+            root.html.unwrap()
+            root.body.unwrap()
+            elt.replace_with(root)
+        style_elt = self.dom.find(id='pretex-style')
+        if style_elt is not None:
+            style_elt.string = cache['style']
+        style_elt = self.dom.find(id='pretex-fonts')
+        if style_elt is not None:
+            style_elt.string = cache['fonts']
         with open(outfile, 'w') as outf:
             outf.write(str(self.dom))
 
     def write_html(self, outfile):
         svgs = self.process_svgs()
+        cached_elts = []
         # Replace DOM elements
         for i, elt in enumerate(self.to_replace):
+            elt_str = str(svgs[i])
             elt.replace_with(svgs[i])
+            cached_elts.append(elt_str)
         style = PRETEX_STYLE
         style += r'''
         svg.pretex text {{
@@ -340,19 +382,25 @@ class HTMLDoc:
           {}
         }}
         '''.format(self.DEFAULT_TEXT.cssText, self.DEFAULT_PATH.cssText)
+        style_elt = self.dom.find(id='pretex-style')
+        if style_elt is not None:
+            style_elt.string = style
         # Add fonts
+        font_style = ''
         for name, data in self.fonts.items():
             name = self.font_hashes[name]
-            style += r'''
+            font_style += r'''
             @font-face {{
               font-family: "{name}";
               src: url(data:application/font-woff;base64,{data}) format('woff');
             }}
             '''.format(name=name, data=b64encode(data).decode('ascii'))
-        self.dom.find(id='pretex-style').string = style
+        style_elt = self.dom.find(id='pretex-fonts')
+        if style_elt is not None:
+            style_elt.string = font_style
         with open(outfile, 'w') as outf:
             outf.write(str(self.dom))
-        self.write_cache(style, svgs)
+        self.write_cache(style, font_style, cached_elts)
 
     def process_svgs(self):
         "Process all generated svgs file for use in an html page."
@@ -371,14 +419,15 @@ class HTMLDoc:
             elt['viewBox'] = '{} {} {} {}'.format(
                 page_extents['left'], page_extents['top'],
                 page_extents['width'],
-                page_extents['height'] + page_extents['depth'])
+                page_extents['height']) #  + page_extents['depth'])
             # The height is relative to the current font size, i.e., 1em.  The
             # fonts in the pdf file are relative to 12pt.
-            elt['height'] = '{}em'.format(
-                (page_extents['heightpt'] + page_extents['depthpt'])/12)
-            if not page_extents['display']:
-                elt['style'] = 'vertical-align: -{}em;'.format(
-                    page_extents['depthpt'] / 12)
+            elt['height'] = '{}em'.format(page_extents['heightem'])
+                #(page_extents['heightem'] + page_extents['depthem'])/12)
+            if not page_extents['display'] and page_extents['depthem'] > 0.0:
+                # Add a descent for below-line spacing
+                elt['style'] = ('margin-bottom:{d}em;vertical-align:-{d}em'
+                                .format(d=page_extents['depthem']))
             # Auto-calculated based on height and viewBox aspect ratio
             del elt['width']
             elt['class'] = 'pretex'
@@ -444,8 +493,10 @@ def main():
         description='Process LaTeX in html files.')
     parser.add_argument('--preamble', default='preamble.tex', type=str,
                         help='LaTeX preamble')
-    parser.add_argument('--outdir', default='build', type=str,
-                        help='Output processed files to this directory')
+    parser.add_argument('--style-path', default='', type=str,
+                        help='Location of LaTeX style files')
+    # parser.add_argument('--outdir', default='build', type=str,
+    #                     help='Output processed files to this directory')
     parser.add_argument('--cache-dir', default='pretex-cache', type=str,
                         help='Cache directory')
     parser.add_argument('--no-cache', action='store_true',
@@ -457,12 +508,14 @@ def main():
     with open(args.preamble) as fobj:
         preamble = fobj.read()
 
-    #with TemporaryDirectory() as tmpdir:
-    class T:
-        name = "tmp"
-    tmpdir = T()
-    if True:
-        html_files = [HTMLDoc(html, preamble, tmpdir.name, args.cache_dir)
+    if args.style_path:
+        os.environ['TEXINPUTS'] = '.:{}:'.format(args.style_path)
+    os.makedirs(args.cache_dir, exist_ok=True)
+
+    with TemporaryDirectory() as tmpdir:
+    #tmpdir = 'tmp'
+    #if True:
+        html_files = [HTMLDoc(html, preamble, tmpdir, args.cache_dir)
                       for html in args.htmls]
 
         # Create pdf files
@@ -478,6 +531,7 @@ def main():
                 done.add(html)
                 continue
             else:
+                #pass # JDR: delete
                 html.latex()
         html_files = [h for h in html_files if h not in done]
         if not html_files:
@@ -487,8 +541,9 @@ def main():
 
         print("Adding unicode codepoints to fonts...")
         # Add unicode codepoints to fonts in all pdf files
-        sfd_dir = os.path.join(tmpdir.name, 'sfd')
-        os.mkdir(sfd_dir)
+        sfd_dir = os.path.join(tmpdir, 'sfd')
+        os.makedirs(sfd_dir, exist_ok=True)
+        # JDR: delete
         proc = Popen(['python2', TOUNICODE, '--outdir', sfd_dir] + pdf_files,
                      stdout=PIPE, stderr=PIPE)
         check_proc(proc, 'Could not add unicode codepoints to fonts')
@@ -498,23 +553,34 @@ def main():
 
         # Convert all fonts
         print("Converting fonts to woff format...")
-        woff_dir = os.path.join(tmpdir.name, 'woff')
-        os.mkdir(woff_dir)
-        script = ''
+        woff_dir = os.path.join(tmpdir, 'woff')
+        os.makedirs(woff_dir, exist_ok=True)
+        script = []
+        # JDR: delete
         for fname in os.listdir(sfd_dir):
             if fname[-4:] != '.sfd':
                 continue
             fullpath = os.path.join(sfd_dir, fname)
-            script += 'Open("{}")\n'.format(fullpath)
-            script += FIX_PRIVATE_TABLE
-            script += 'Generate("{}")\n'.format(
+            entry = ''
+            entry += 'Open("{}")\n'.format(fullpath)
+            entry += FIX_PRIVATE_TABLE
+            entry += 'Generate("{}")\n'.format(
                 os.path.join(woff_dir, fname[:-4] + '.woff'))
+            script.append(entry)
+            # Process 1000 at a time; otherwise ff might segfault
+            if len(script) == 1000:
+                proc = Popen([FONTFORGE, '-lang=ff', '-script', '-'],
+                             stdin=PIPE, stdout=PIPE, stderr=PIPE)
+                check_proc(proc, 'Could not convert pdf fonts to woff format',
+                           stdin=''.join(script))
+                script = []
         proc = Popen([FONTFORGE, '-lang=ff', '-script', '-'],
                      stdin=PIPE, stdout=PIPE, stderr=PIPE)
         check_proc(proc, 'Could not convert pdf fonts to woff format',
-                   script)
+                   stdin=''.join(script))
 
         # Associate the fonts with their html filse
+        # JDR: delete
         for fname in os.listdir(woff_dir):
             match = re.match(r'\[(.*)\](.*)\.woff', fname)
             if not match:
@@ -533,10 +599,12 @@ def main():
         # Process svg files and write html
         print("Writing html files...")
         for html in html_files:
+            #print("Writing {} ({})".format(os.path.basename(html.html_file),
+            #                               os.path.basename(html.basename)))
             html.write_html(html.html_file)
 
 
 if __name__ == "__main__":
-    Popen(['rm', '-rf', 'tmp']).wait()
-    os.mkdir('tmp')
+    #Popen(['rm', '-rf', 'tmp']).wait()
+    #os.mkdir('tmp')
     main()

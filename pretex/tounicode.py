@@ -19,22 +19,33 @@ if platform.system() == 'Darwin':
 import cairo
 import fontforge
 import poppler
-from aglfn import GLYPHS
 from pdfrw import PdfReader, PdfWriter, PdfDict
 
-
+from aglfn import GLYPHS
+from pdf_enc import ENCODINGS
 
 def chunks(l, n):
     "Yield successive n-sized chunks from l."
     for i in range(0, len(l), n):
         yield l[i:i+n]
 
-def generate_tounicode(font):
+def generate_tounicode(font, pdffont):
     "Generate a ToUnicode CMAP table for the font."
     cmap_entries = []
     used_codepoints = set([GLYPHS[glyphname].codepoint
                            for glyphname in font
                            if glyphname in GLYPHS])
+    pdf_encoding = ENCODINGS['NoEncoding']()
+    if hasattr(pdffont, 'Encoding') and pdffont.Encoding:
+        # fontforge uses the raw postscript font; it won't take into account the
+        # pdf font's encoding override
+        encoding = pdffont.Encoding
+        if hasattr(encoding, 'BaseEncoding') and encoding.BaseEncoding:
+            pdf_encoding = ENCODINGS[encoding.BaseEncoding]()
+        else:
+            pdf_encoding = ENCODINGS['StandardEncoding']()
+        if hasattr(encoding, 'Differences') and encoding.Differences:
+            pdf_encoding.modify(encoding.Differences)
     # "Miscellaneous Symbols" starts here
     last_unknown = 0x2600
     for glyphname in font:
@@ -49,7 +60,10 @@ def generate_tounicode(font):
             last_unknown += 1
         glyph.unicode = codepoint
         used_codepoints.add(codepoint)
-        cmap_entries.append((glyph.encoding, codepoint))
+        if glyphname in pdf_encoding:
+            cmap_entries.append((pdf_encoding[glyphname], codepoint))
+        else:
+            cmap_entries.append((glyph.encoding, codepoint))
 
     out = ''
     out += ('12 dict begin\n'
@@ -94,7 +108,8 @@ def main():
             print("Adding ToUnicode table to font {}".format(fontname))
             font = fontforge.open('{}({})'.format(pdf, fontname))
             fonts[fontname].ToUnicode = PdfDict()
-            fonts[fontname].ToUnicode.stream = generate_tounicode(font)
+            fonts[fontname].ToUnicode.stream = generate_tounicode(
+                font, fonts[fontname])
             # Need to save the modified font because fontforge won't read
             # ToUnicode when it converts to woff later.
             font.save(os.path.join(

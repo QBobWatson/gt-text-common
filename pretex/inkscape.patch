@@ -58,18 +58,6 @@ diff -Naur a/src/extension/internal/pdfinput/svg-builder.cpp b/src/extension/int
                      sp_repr_css_attr_unref((*prev_iterator).style);
                  }
              }
-@@ -1433,8 +1439,11 @@
-         new_glyph.style = _setStyle(state, has_fill, has_stroke);
-         new_glyph.render_mode = render_mode;
-         sp_repr_css_merge(new_glyph.style, _font_style); // Merge with font style
-+        printf("Glyph: style changed; fill: %s\n", sp_repr_css_property(new_glyph.style, "fill", "???")); // DELETEME
-+        std::cout << new_glyph.code << std::endl; // DELETEME
-         _invalidated_style = false;
-     } else {
-+        printf("Glyph: style not changed\n"); // DELETEME
-         new_glyph.style_changed = false;
-         // Point to previous glyph's style information
-         const SvgGlyph& prev_glyph = _glyphs.back();
 diff -Naur a/src/inkscape.h b/src/inkscape.h
 --- a/src/inkscape.h	2017-02-13 18:46:57.000000000 -0500
 +++ b/src/inkscape.h	2017-11-15 21:05:36.201275900 -0500
