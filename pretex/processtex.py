@@ -95,7 +95,7 @@ LATEX_DISPLAY = r'''%
 
 PRETEX_STYLE = '''
 .pretex {
-  font-size: 115%;   /* roughly match ex-sizes */
+  /*font-size: 115%;*/   /* roughly match ex-sizes */
 }
 svg.pretex {
   display:      inline-block;
@@ -105,7 +105,7 @@ svg.pretex {
   font-style:   normal;
 }
 .mathbook-content header .pretex {
-  font-size:    106%;   /* roughly match ex-sizes */
+  /*font-size:    106%;*/   /* roughly match ex-sizes */
 }
 .pretex-display {
   text-align:  center;
@@ -126,7 +126,7 @@ svg.pretex {
 }
 .pretex-display .tag > span {
   display: inline-block;
-  font-size: 115%;
+  /*font-size: 115%;*/
 }
 '''
 
