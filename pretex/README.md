@@ -1,7 +1,7 @@
 
-* Instructions for installing dependencies
+# Instructions for installing dependencies
 
-** Mac
+## Mac
 
 First `cd` into `gt-text-common/pretex`.
 
@@ -16,7 +16,7 @@ pip2 install ./pypoppler-0.12.2-jdr.tar.gz
 pip3 install cssutils lxml bs4
 ```
 
-* Debian-based linux
+## Debian-based linux
 
 First `cd` into `gt-text-common/pretex`.
 
