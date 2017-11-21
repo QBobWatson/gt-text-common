@@ -22,11 +22,11 @@ First `cd` into `gt-text-common/pretex`.
 
 ```
 sudo apt-get install python-minimal python3-minimal python-pip python3-pip python-poppler fontforge libcairo2-dev
-pip2 install ./pycairo-1.15.3.tar.gz`
-pip2 install pdfrw`
-pip3 install cssutils lxml bs4`
-sudo apt-get build-dep inkscape`
-sudo apt-get source inkscape`
+pip2 install ./pycairo-1.15.3.tar.gz
+pip2 install pdfrw
+pip3 install cssutils lxml bs4
+sudo apt-get build-dep inkscape
+sudo apt-get source inkscape
 cd inkscape-[version] && patch -p1 < ../inkscape.patch && dpkg-buildpkg -b
 ```
 
