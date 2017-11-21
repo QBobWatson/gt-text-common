@@ -84,10 +84,10 @@ LATEX_CODE_INLINE = r'''%
 '''
 
 # tounicode.py calculates the extents for displayed equations
-# html is 600px wide
+# html is 675px wide
 LATEX_DISPLAY = r'''%
 \pdfsavepos\write\boxsize{{prepage:\the\pdflastypos}}
-\begin{{minipage}}{{6.25in}}%
+\begin{{minipage}}{{7in}}%
 {code}%
 \end{{minipage}}%
 \writesize{{display:}}%

@@ -31,6 +31,7 @@
 /* Overrides the overrides in mathbook-add-on.css */
 body, html body {
     background: #545454;
+    /* JDR: Bitstream Charter looks better at this size.  Don't change this in the Compass stylesheets though!  It can't actually handle a non-default base font size. */
     font-size: 18px;
 }
 
