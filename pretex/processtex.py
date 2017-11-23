@@ -14,6 +14,8 @@ from tempfile import TemporaryDirectory
 import cssutils
 from bs4 import BeautifulSoup
 
+import simpletransform
+
 cssutils.log.setLevel(logging.CRITICAL)
 
 BASE = os.path.dirname(__file__)
@@ -28,6 +30,7 @@ else:
 
 # Snippet to tell fontforge to delete some empty lists.
 # Otherwise the Webkit CFF sanitizer balks.
+# Also, FF seems to incorrectly save default values for some entries.
 FIX_PRIVATE_TABLE = '''
   if(GetPrivateEntry("OtherBlues") == "[]")
      ClearPrivateEntry("OtherBlues")
@@ -37,6 +40,15 @@ FIX_PRIVATE_TABLE = '''
   endif
   if(GetPrivateEntry("FamilyOtherBlues") == "[]")
      ClearPrivateEntry("FamilyOtherBlues")
+  endif
+  if(GetPrivateEntry("BlueShift") == "")
+     ChangePrivateEntry("BlueShift", "7")
+  endif
+  if(GetPrivateEntry("BlueScale") == "")
+     ChangePrivateEntry("BlueScale", ".039625")
+  endif
+  if(GetPrivateEntry("BlueFuzz") == "")
+     ChangePrivateEntry("BlueFuzz", "1")
   endif
 '''
 
@@ -52,6 +64,8 @@ LATEX_PREAMBLE = r'''
 \def\writesize#1{\write\boxsize{#1}}
 \newsavebox\measurebox
 
+\newlength\emlength
+
 \def\postag#1{\tag*{\phantom{#1}\pdfsavepos\write\boxsize{tag:{#1},\the\pdflastypos}}}
 
 \pagestyle{empty}
@@ -63,6 +77,7 @@ LATEX_BEGIN = r'''
 \parindent=0pt%
 \parskip=0pt%
 \thispagestyle{empty}%
+\emlength=1em\writesize{fontsize:\the\emlength}%
 '''
 
 LATEX_NEWPAGE = r'\newpage\topskip=0pt%' + '\n'
@@ -84,7 +99,7 @@ LATEX_CODE_INLINE = r'''%
 '''
 
 # tounicode.py calculates the extents for displayed equations
-# html is 675px wide
+# html is 675px ~ 7in wide
 LATEX_DISPLAY = r'''%
 \pdfsavepos\write\boxsize{{prepage:\the\pdflastypos}}
 \begin{{minipage}}{{7in}}%
@@ -94,8 +109,19 @@ LATEX_DISPLAY = r'''%
 '''
 
 PRETEX_STYLE = '''
-.pretex {
-  /*font-size: 115%;*/   /* roughly match ex-sizes */
+.pretex-inline {
+  display: inline-block;
+}
+.pretex-inline span {
+  display: inline-block;
+}
+.pretex-inline span:last-child {
+  position: relative;
+}
+.pretex-inline span:last-child svg.pretex {
+  position: absolute;
+  bottom:   0;
+  height:   1em;
 }
 svg.pretex {
   display:      inline-block;
@@ -103,9 +129,6 @@ svg.pretex {
   font-variant: normal;
   font-weight:  normal;
   font-style:   normal;
-}
-.mathbook-content header .pretex {
-  /*font-size:    106%;*/   /* roughly match ex-sizes */
 }
 .pretex-display {
   text-align:  center;
@@ -126,7 +149,6 @@ svg.pretex {
 }
 .pretex-display .tag > span {
   display: inline-block;
-  /*font-size: 115%;*/
 }
 '''
 
@@ -261,8 +283,14 @@ class HTMLDoc:
         self.pages_extents = []
         this_prepage = 0
         this_tags = []
+        fontsize = 12
         with open(self.boxsize_file) as fobj:
             for line in fobj.readlines():
+                if line.startswith('fontsize:'):
+                    # Should be the first line; ends in "pt\n"
+                    # Convert to big (usual) points
+                    fontsize = float(line[len('fontsize:'):-3]) * 800/803
+                    continue
                 if line.startswith('prepage:'):
                     # Position of the top of the page (relative to the bottom)
                     this_prepage = float(line[len('prepage:'):])
@@ -277,6 +305,7 @@ class HTMLDoc:
                     pos = this_prepage - float(pos)
                     # This is in in sp = 1/65536 pt
                     pos /= 65536
+                    pos *= 800/803
                     this_tags.append((contents, pos))
                     continue
                 match = re.match(
@@ -298,7 +327,7 @@ class HTMLDoc:
                     left, top, width, height \
                         = [float(x) for x in match.groups()]
                     depth = 0
-                    this_tags = [(c, y - top * 803/800) for c, y in this_tags]
+                    this_tags = [(c, y - top) for c, y in this_tags]
                 # In Inkscape, 96 user units (or "px") is one inch, which is 72
                 # pt.  The "width", "height", and "depth" are used to specify
                 # the viewBox, which is in user units.
@@ -309,22 +338,26 @@ class HTMLDoc:
                     "top"    : top    * 96/72,
                     "depth"  : depth  * 96/72,
                     "tags"   : this_tags,
-                    # These are used for the "height" and "vertical-align"
-                    # properties, which are relative to the current font size.
-                    "heightem" : height * 803/800 / 12,
-                    "depthem"  : depth  * 803/800 / 12,
+                    # These are used for the "width", "height", and
+                    # "vertical-align" properties, which are relative to the
+                    # current font size.
+                    "fontsize" : fontsize,
+                    "widthem"  : width  / fontsize,
+                    "heightem" : height / fontsize,
+                    "depthem"  : depth  / fontsize,
                     "display"  : typ == 'display',
                 }
                 self.pages_extents.append(page_extents)
                 this_tags = []
                 this_prepage = 0
         self.num_pages = len(self.pages_extents)
+        self.DEFAULT_TEXT['font-size'] = "{}px".format(fontsize)
 
     def inkscape_script(self):
         "Generate inkscape commands necessary to convert pdf to svg."
         script = ''
         for page_num in range(self.num_pages):
-            script += '--file="{}" --pdf-page={} --export-dpi=96' \
+            script += '--file="{}" --pdf-page={}' \
                       ' --export-plain-svg="{}"\n' \
                       .format(self.pdf_file, page_num+1,
                               self.svg_file(page_num))
@@ -415,19 +448,6 @@ class HTMLDoc:
             for key in list(elt.attrs.keys()):
                 if key not in self.SVG_ATTRS:
                     del elt[key]
-            # Plug in actual size data
-            elt['viewBox'] = '{} {} {} {}'.format(
-                page_extents['left'], page_extents['top'],
-                page_extents['width'],
-                page_extents['height']) #  + page_extents['depth'])
-            # The height is relative to the current font size, i.e., 1em.  The
-            # fonts in the pdf file are relative to 12pt.
-            elt['height'] = '{}em'.format(page_extents['heightem'])
-                #(page_extents['heightem'] + page_extents['depthem'])/12)
-            if not page_extents['display'] and page_extents['depthem'] > 0.0:
-                # Add a descent for below-line spacing
-                elt['style'] = ('margin-bottom:{d}em;vertical-align:-{d}em'
-                                .format(d=page_extents['depthem']))
             # Auto-calculated based on height and viewBox aspect ratio
             del elt['width']
             elt['class'] = 'pretex'
@@ -439,6 +459,29 @@ class HTMLDoc:
             # Get rid of empty defs
             if not elt.defs.find_all():
                 elt.defs.decompose()
+            # Undo global page coordinate transforms
+            units_in_pt = unwrap_transforms(elt)
+            # Plug in actual size data
+            if page_extents['display']:
+                scale = 72/96 if units_in_pt else 1
+                elt['viewBox'] = '{} {} {} {}'.format(
+                    scale * page_extents['left'],
+                    scale * page_extents['top'],
+                    scale * page_extents['width'],
+                    scale * page_extents['height']
+                )
+                # The height is 1em.  The fonts in the pdf file are relative to
+                # fontsize.
+                elt['height'] = '{}em'.format(page_extents['heightem'])
+            else:
+                scale = 1 if units_in_pt else 96/72
+                # The size of the view box doesn't matter, since the wrapper and
+                # the strut take care of spacing.  Set it to a 1em square.
+                elt['viewBox'] = '0 -{fs} {fs} {fs}'.format(
+                    fs=page_extents['fontsize']*(
+                        1 if units_in_pt else 96/72))
+                # height is 1em; it is set in css
+                del elt['height']
             # Clean up text styles
             for tspan in elt.find_all('tspan', style=True):
                 css = cssutils.parseStyle(tspan['style'])
@@ -451,6 +494,12 @@ class HTMLDoc:
                 for key in self.DEFAULT_TEXT.keys():
                     if css[key] == self.DEFAULT_TEXT[key]:
                         del css[key]
+                if 'font-size' in css:
+                    match = re.match(r'([\d\.]+).*', css['font-size'])
+                    size = float(match.group(1))
+                    if abs(size - page_extents['fontsize']) <= .001:
+                        # It's using the default font size
+                        del css['font-size']
                 # Replace font-family with font number (save space)
                 font_family = css.getPropertyCSSValue('font-family')
                 if font_family[0]:
@@ -470,8 +519,8 @@ class HTMLDoc:
             for elt2 in elt.find_all(id=True):
                 if not elt2.find_parents("defs"):
                     del elt2['id']
-            # Wrap displayed equations
             if page_extents['display']:
+                # Wrap displayed equations
                 elt = elt.wrap(soup.new_tag('div'))
                 elt['class'] = 'pretex-display'
                 # Add tags
@@ -481,11 +530,125 @@ class HTMLDoc:
                     tagelt.string = '('+contents+')'
                     # This moves the tag down the calculated amount
                     htelt = soup.new_tag('span')
-                    htelt['style'] = 'height:{}em'.format(pos/12)
+                    htelt['style'] = 'height:{}em'.format(
+                        pos / page_extents['fontsize'])
                     tagelt.append(htelt)
                     elt.append(tagelt)
+            else:
+                # After much experimentation, this seems to be the most reliable
+                # way to lock the origin of the svg to the baseline.
+                wrapper = soup.new_tag('span')
+                wrapper['class'] = 'pretex-inline'
+                wrapper['style'] = 'width:{}em'.format(page_extents['widthem'])
+                elt.wrap(wrapper)
+                # make strut
+                style = 'height:{}em'.format(
+                    page_extents['heightem'] + page_extents['depthem'])
+                if page_extents['depthem'] > 0.0:
+                    style += ';vertical-align:-{}em'.format(
+                        page_extents['depthem'])
+                elt.insert_before(soup.new_tag('span', style=style))
+                # This last span is relatively positioned.  Its size will be
+                # 0x0, so it sits right on the baseline.  The bottom of the svg
+                # is then absolutely positioned to that.
+                elt.wrap(soup.new_tag('span'))
+                elt = wrapper
             svgs.append(elt)
         return svgs
+
+
+def almost_zero(num, ε=0.0001):
+    return abs(num) < ε
+
+def smart_round(num, decimals=8):
+    'Round "num" to the fewest decimal places possible within given precision'
+    # There must be a less stupid algorithm...
+    if not isinstance(num, float):
+        return num
+    error = 1.0
+    for i in range(decimals):
+        error /= 10
+    if num < 0:
+        num *= -1
+        neg = -1
+    else:
+        neg = 1
+    for i in range(decimals):
+        shift = num
+        for j in range(i):
+            shift *= 10
+        approx1 = int(shift)
+        approx2 = int(shift) + 1
+        for j in range(i):
+            approx1 /= 10.0
+            approx2 /= 10.0
+        if num - approx1 < error:
+            return ("{:." + str(i) + "f}").format(neg * approx1)
+        if approx2 - num < error:
+            return ("{:." + str(i) + "f}").format(neg * approx2)
+    return neg * num
+
+def simplify_transforms(svg):
+    'Re-format transform attributes to save characters.'
+    for elt in svg.find_all(transform=True):
+        mat = simpletransform.parse_transform(elt['transform'])
+        # Recognize identity / translation
+        if (almost_zero(mat[0][0] - 1) and
+            almost_zero(mat[1][1] - 1) and
+            almost_zero(mat[0][1]) and
+            almost_zero(mat[1][0])):
+            if almost_zero(mat[1][2]):
+                if almost_zero(mat[0][2]):
+                    del elt['transform']
+                    continue
+                elt['transform'] = 'translate({})'.format(
+                    smart_round(mat[0][2]))
+                continue
+            elt['transform'] = 'translate({} {})'.format(
+                smart_round(mat[0][2]), smart_round(mat[1][2]))
+            continue
+        # Recognize scale
+        if (almost_zero(mat[0][1]) and
+            almost_zero(mat[0][2]) and
+            almost_zero(mat[1][0]) and
+            almost_zero(mat[1][2])):
+            if almost_zero(mat[0][0] - mat[1][1]):
+                elt['transform'] = 'scale({})'.format(
+                    smart_round(mat[0][0]))
+                continue
+            elt['transform'] = 'scale({} {})'.format(
+                smart_round(mat[0][0]), smart_round(mat[1][1]))
+            continue
+        elt['transform'] = "matrix({},{},{},{},{},{})".format(
+            smart_round(mat[0][0]), smart_round(mat[1][0]),
+            smart_round(mat[0][1]), smart_round(mat[1][1]),
+            smart_round(mat[0][2]), smart_round(mat[1][2]))
+
+def unwrap_transforms(svg):
+    'Undo global coordinate transformation, if there is one.'
+    groups = svg.find_all('g', recursive=False)
+    if len(groups) != 1:
+        return False
+    group = groups[0]
+    if not set(group.attrs.keys()) <= {'id', 'transform'}:
+        return False
+    if not group.get('transform'):
+        return False
+    mat = simpletransform.parse_transform(group['transform'])
+    # Recognize pdf coordinate transformation
+    if not (almost_zero(mat[0][0] - 4/3) and
+            almost_zero(mat[1][1] + 4/3) and
+            almost_zero(mat[0][1])       and
+            almost_zero(mat[1][0])       and
+            almost_zero(mat[0][2])):
+        return False
+    mat = [[1, 0, 0], [0, -1, mat[1][2]*3/4]]
+    for child in group.find_all(recursive=False):
+        child_mat = simpletransform.parse_transform(child.get('transform'), mat)
+        child['transform'] = simpletransform.format_transform(child_mat)
+    group.unwrap()
+    simplify_transforms(svg)
+    return True
 
 
 def main():
@@ -531,7 +694,6 @@ def main():
                 done.add(html)
                 continue
             else:
-                #pass # JDR: delete
                 html.latex()
         html_files = [h for h in html_files if h not in done]
         if not html_files:
@@ -543,7 +705,6 @@ def main():
         # Add unicode codepoints to fonts in all pdf files
         sfd_dir = os.path.join(tmpdir, 'sfd')
         os.makedirs(sfd_dir, exist_ok=True)
-        # JDR: delete
         proc = Popen(['python2', TOUNICODE, '--outdir', sfd_dir] + pdf_files,
                      stdout=PIPE, stderr=PIPE)
         check_proc(proc, 'Could not add unicode codepoints to fonts')
@@ -556,7 +717,6 @@ def main():
         woff_dir = os.path.join(tmpdir, 'woff')
         os.makedirs(woff_dir, exist_ok=True)
         script = []
-        # JDR: delete
         for fname in os.listdir(sfd_dir):
             if fname[-4:] != '.sfd':
                 continue
@@ -580,7 +740,6 @@ def main():
                    stdin=''.join(script))
 
         # Associate the fonts with their html filse
-        # JDR: delete
         for fname in os.listdir(woff_dir):
             match = re.match(r'\[(.*)\](.*)\.woff', fname)
             if not match:
@@ -605,6 +764,4 @@ def main():
 
 
 if __name__ == "__main__":
-    #Popen(['rm', '-rf', 'tmp']).wait()
-    #os.mkdir('tmp')
     main()
