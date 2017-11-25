@@ -10,6 +10,7 @@
 import argparse
 import os
 import sys
+import unicodedata
 
 import platform
 if platform.system() == 'Darwin':
@@ -20,8 +21,9 @@ import fontforge
 import poppler
 from pdfrw import PdfReader, PdfWriter, PdfDict
 
-from aglfn import GLYPHS
+from aglfn import GLYPHS, GLYPHS_BYCP
 from pdf_enc import ENCODINGS
+
 
 def chunks(l, n):
     "Yield successive n-sized chunks from l."
@@ -45,20 +47,28 @@ def generate_tounicode(font, pdffont):
             pdf_encoding = ENCODINGS['StandardEncoding']()
         if hasattr(encoding, 'Differences') and encoding.Differences:
             pdf_encoding.modify(encoding.Differences)
-    # "Miscellaneous Symbols" starts here
-    last_unknown = 0x2600
+    # Latin script starts here
+    last_unknown = 0x0021
     for glyphname in font:
         glyph = font[glyphname]
         if glyphname in GLYPHS:
             codepoint = GLYPHS[glyphname].codepoint
         else:
-            # Use the next miscellaneous symbol
-            while last_unknown in used_codepoints:
+            # Use the next nice symbol
+            while (last_unknown in used_codepoints or
+                   last_unknown not in GLYPHS_BYCP or
+                   unicodedata.category(unichr(last_unknown))
+                   not in ('Lu', 'Ll')):
                 last_unknown += 1
             codepoint = last_unknown
+            glyph.glyphname = GLYPHS_BYCP[codepoint].name
             last_unknown += 1
         glyph.unicode = codepoint
         used_codepoints.add(codepoint)
+        if glyph.width == 0:
+            # Safari won't display zero-width glyphs -- and the "not equal" sign
+            # uses one... anyway, "1" is 1/1000 em.
+            glyph.width = 1
         if glyphname in pdf_encoding:
             cmap_entries.append((pdf_encoding[glyphname], codepoint))
         else:
@@ -88,6 +98,7 @@ def main():
                         help='PDF files to process')
     args = parser.parse_args()
 
+    fontnum = 0
     for pdf in args.pdfs:
         print("Adding ToUnicode tables to PDF file {}".format(pdf))
         with open(pdf, 'rb') as fobj:
@@ -111,9 +122,11 @@ def main():
                 font, fonts[fontname])
             # Need to save the modified font because fontforge won't read
             # ToUnicode when it converts to woff later.
+            font.fontname = 'pretex{:06d}'.format(fontnum)
             font.save(os.path.join(
                 args.outdir, '[{}]{}.sfd'.format(
                     os.path.basename(pdf)[:-4], fontname)))
+            fontnum += 1
         PdfWriter(pdf, trailer=doc).write()
 
         # Measure extents for displayed equations

@@ -380,7 +380,6 @@ class HTMLDoc:
 
     def use_cached(self, outfile):
         "Write the cached output to the html file."
-        #print("Using cached {}".format(os.path.basename(outfile)))
         with open(self.html_cache) as fobj:
             cache = json.load(fobj)
         # Replace DOM elements
@@ -758,8 +757,6 @@ def main():
         # Process svg files and write html
         print("Writing html files...")
         for html in html_files:
-            #print("Writing {} ({})".format(os.path.basename(html.html_file),
-            #                               os.path.basename(html.basename)))
             html.write_html(html.html_file)
 
 

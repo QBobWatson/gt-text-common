@@ -703,8 +703,10 @@ class Glyph(object):
         self.descr = descr
 
 GLYPHS = {}
+GLYPHS_BYCP = {}
 
 for line in GLYPHLIST.split(u'\n'):
     _char, _name, _descr = line.split(u';')
     _glyph = Glyph(_char, _name, _descr)
     GLYPHS[_name] = _glyph
+    GLYPHS_BYCP[_glyph.codepoint] = _glyph
