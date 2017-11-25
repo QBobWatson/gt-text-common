@@ -79,6 +79,10 @@ body, html body {
     vertical-align: middle;
 }
 
+#toc {
+  pointer-events: initial;
+}
+
 #toc h2 + h2 {
     margin-top: 0px;
 }
