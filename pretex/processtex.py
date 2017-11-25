@@ -693,6 +693,8 @@ def main():
                 done.add(html)
                 continue
             else:
+                print("(Re)processing {}".format(
+                    os.path.basename(html.html_file)))
                 html.latex()
         html_files = [h for h in html_files if h not in done]
         if not html_files:
