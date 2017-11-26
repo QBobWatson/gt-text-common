@@ -8,6 +8,7 @@ import re
 import sys
 from base64 import b64encode
 from hashlib import md5
+from shutil import move
 from subprocess import Popen, PIPE
 from tempfile import TemporaryDirectory
 
@@ -69,6 +70,9 @@ LATEX_PREAMBLE = r'''
 \def\postag#1{\tag*{\phantom{#1}\pdfsavepos\write\boxsize{tag:{#1},\the\pdflastypos}}}
 
 \pagestyle{empty}
+
+\usepackage{graphicx}
+\graphicspath{{figure-images/}{.}}
 '''
 
 LATEX_BEGIN = r'''
@@ -152,6 +156,9 @@ svg.pretex {
 }
 '''
 
+# This is where processed images end up under build/
+FIGURE_IMG_DIR = 'figure-images'
+
 
 def check_proc(proc, msg='', stdin=None):
     "Run a process and die verbosely on error."
@@ -192,7 +199,7 @@ class HTMLDoc:
         stroke-opacity:    1;
     ''')
 
-    def __init__(self, html_file, preamble, tmp_dir, cache_dir):
+    def __init__(self, html_file, preamble, tmp_dir, cache_dir, img_dir):
         self.html_file = html_file
         with open(self.html_file) as fobj:
             self.html_data = fobj.read()
@@ -203,11 +210,15 @@ class HTMLDoc:
         self.base_dir = os.path.join(tmp_dir, self.basename)
         self.pdf_dir = os.path.join(self.base_dir, 'pdf')
         self.svg_dir = os.path.join(self.base_dir, 'svg')
+        self.out_img_dir = os.path.join(tmp_dir, 'img')
         self.cache_dir = cache_dir
 
         os.makedirs(self.base_dir, exist_ok=True)
         os.makedirs(self.pdf_dir, exist_ok=True)
         os.makedirs(self.svg_dir, exist_ok=True)
+        os.symlink(os.path.realpath(img_dir),
+                   os.path.join(self.pdf_dir, 'figure-images'),
+                   target_is_directory=True)
 
         self.latex_file = os.path.join(self.pdf_dir, self.basename + '.tex')
         self.pdf_file = os.path.join(self.pdf_dir, self.basename + '.pdf')
@@ -216,6 +227,8 @@ class HTMLDoc:
         self.num_pages = 0
         self.fonts = {}
         self.font_hashes = {}
+        self.images = []
+        self.contents = ''
         self.html_cache = None
 
     @property
@@ -481,43 +494,19 @@ class HTMLDoc:
                         1 if units_in_pt else 96/72))
                 # height is 1em; it is set in css
                 del elt['height']
-            # Clean up text styles
-            for tspan in elt.find_all('tspan', style=True):
-                css = cssutils.parseStyle(tspan['style'])
-                # These are hard-coded into the font, but not marked as such
-                del css['font-variant']
-                del css['font-weight']
-                del css['font-style']
-                del css['-inkscape-font-specification']
-                # Get rid of inherited styles
-                for key in self.DEFAULT_TEXT.keys():
-                    if css[key] == self.DEFAULT_TEXT[key]:
-                        del css[key]
-                if 'font-size' in css:
-                    match = re.match(r'([\d\.]+).*', css['font-size'])
-                    size = float(match.group(1))
-                    if abs(size - page_extents['fontsize']) <= .001:
-                        # It's using the default font size
-                        del css['font-size']
-                # Replace font-family with font number (save space)
-                font_family = css.getPropertyCSSValue('font-family')
-                if font_family[0]:
-                    font_family = font_family[0].value
-                if font_family in self.font_hashes:
-                    css['font-family'] = self.font_hashes[font_family]
-                tspan['style'] = css.cssText
-            # Clean up path styles
-            for path in elt.find_all('path', style=True):
-                css = cssutils.parseStyle(path['style'])
-                # Get rid of inherited styles
-                for key in self.DEFAULT_PATH.keys():
-                    if css[key] == self.DEFAULT_PATH[key]:
-                        del css[key]
-                path['style'] = css.cssText
             # Get rid of ids
             for elt2 in elt.find_all(id=True):
                 if not elt2.find_parents("defs"):
                     del elt2['id']
+            # Clean up text styles
+            for tspan in elt.find_all('tspan', style=True):
+                self.process_tspan(tspan, page_extents['fontsize'])
+            # Clean up path styles
+            for path in elt.find_all('path', style=True):
+                self.process_path(path)
+            # Process linked images
+            for img in elt.find_all('image'):
+                self.process_image(img)
             if page_extents['display']:
                 # Wrap displayed equations
                 elt = elt.wrap(soup.new_tag('div'))
@@ -554,6 +543,66 @@ class HTMLDoc:
                 elt = wrapper
             svgs.append(elt)
         return svgs
+
+    def process_tspan(self, tspan, page_font_size):
+        "Simplify <tspan> tag."
+        css = cssutils.parseStyle(tspan['style'])
+        # These are hard-coded into the font, but not marked as such
+        del css['font-variant']
+        del css['font-weight']
+        del css['font-style']
+        del css['-inkscape-font-specification']
+        # Get rid of inherited styles
+        for key in self.DEFAULT_TEXT.keys():
+            if css[key] == self.DEFAULT_TEXT[key]:
+                del css[key]
+        if 'font-size' in css:
+            match = re.match(r'([\d\.]+).*', css['font-size'])
+            size = float(match.group(1))
+            if abs(size - page_font_size) <= .001:
+                # It's using the default font size
+                del css['font-size']
+        # Replace font-family with font number (save space)
+        font_family = css.getPropertyCSSValue('font-family')
+        if font_family[0]:
+            font_family = font_family[0].value
+        if font_family in self.font_hashes:
+            css['font-family'] = self.font_hashes[font_family]
+        tspan['style'] = css.cssText
+        if not tspan['style']:
+            del tspan['style']
+
+    def process_path(self, path):
+        "Simplify <path> tag."
+        css = cssutils.parseStyle(path['style'])
+        # Get rid of inherited styles
+        for key in self.DEFAULT_PATH.keys():
+            if css[key] == self.DEFAULT_PATH[key]:
+                del css[key]
+        path['style'] = css.cssText
+        if not path['style']:
+            del path['style']
+
+    def process_image(self, img):
+        "Simplify <image> tag."
+        href = img['xlink:href']
+        del img['xlink:href']
+        # Inkscape has no idea where the file ended up
+        fname = os.path.join(self.out_img_dir, os.path.basename(href))
+        # Cache the image by a hash of its content
+        with open(fname, 'rb') as fobj:
+            img_hash = md5(fobj.read()).hexdigest()
+        img_name = img_hash + '.png'
+        self.images.append(img_name)
+        img['href'] = FIGURE_IMG_DIR + '/' + img_name
+        # Move to the cache directory
+        move(fname, os.path.join(self.cache_dir, img_name))
+        # Simplify css
+        css = cssutils.parseStyle(img['style'])
+        del css['image-rendering']
+        img['style'] = css.cssText
+        if not img['style']:
+            del img['style']
 
 
 def almost_zero(num, ε=0.0001):
@@ -657,10 +706,10 @@ def main():
                         help='LaTeX preamble')
     parser.add_argument('--style-path', default='', type=str,
                         help='Location of LaTeX style files')
-    # parser.add_argument('--outdir', default='build', type=str,
-    #                     help='Output processed files to this directory')
     parser.add_argument('--cache-dir', default='pretex-cache', type=str,
                         help='Cache directory')
+    parser.add_argument('--img-dir', default='figure-images', type=str,
+                        help='LaTeX image include directory')
     parser.add_argument('--no-cache', action='store_true',
                         help='Ignore cache and regenerate')
     parser.add_argument('htmls', type=str, nargs='+',
@@ -675,9 +724,10 @@ def main():
     os.makedirs(args.cache_dir, exist_ok=True)
 
     with TemporaryDirectory() as tmpdir:
-    #tmpdir = 'tmp'
+    #tmpdir = os.path.realpath('./tmp')
     #if True:
-        html_files = [HTMLDoc(html, preamble, tmpdir, args.cache_dir)
+        html_files = [HTMLDoc(html, preamble, tmpdir,
+                              args.cache_dir, args.img_dir)
                       for html in args.htmls]
 
         # Create pdf files
@@ -751,9 +801,13 @@ def main():
 
         # Convert all pages of all pdf files to svg files
         print("Generating svg files...")
+        # inkscape exports images to the current directory
+        img_dir = os.path.join(tmpdir, 'img')
+        os.makedirs(img_dir, exist_ok=True)
         script = ''.join(html.inkscape_script() for html in html_files)
         proc = Popen(['inkscape', '--shell'],
-                     stdout=PIPE, stderr=PIPE, stdin=PIPE)
+                     stdout=PIPE, stderr=PIPE, stdin=PIPE,
+                     cwd=img_dir)
         check_proc(proc, "SVG conversion failed", script)
 
         # Process svg files and write html
