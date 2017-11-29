@@ -216,9 +216,10 @@ class HTMLDoc:
         os.makedirs(self.base_dir, exist_ok=True)
         os.makedirs(self.pdf_dir, exist_ok=True)
         os.makedirs(self.svg_dir, exist_ok=True)
-        os.symlink(os.path.realpath(img_dir),
-                   os.path.join(self.pdf_dir, 'figure-images'),
-                   target_is_directory=True)
+        link_dest = os.path.join(self.pdf_dir, 'figure-images')
+        if not os.path.exists(link_dest):
+            os.symlink(os.path.realpath(img_dir), link_dest,
+                       target_is_directory=True)
 
         self.latex_file = os.path.join(self.pdf_dir, self.basename + '.tex')
         self.pdf_file = os.path.join(self.pdf_dir, self.basename + '.pdf')
