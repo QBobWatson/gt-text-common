@@ -250,9 +250,13 @@ class HTMLDoc:
             if elt['type'] == 'text/x-latex-inline':
                 pages.append(LATEX_INLINE.format(code=code))
                 pages.append(LATEX_NEWPAGE)
-            if elt['type'] == 'text/x-latex-code-inline':
+            elif elt['type'] == 'text/x-latex-code-inline':
                 pages.append(LATEX_CODE_INLINE.format(code=code))
                 pages.append(LATEX_NEWPAGE)
+            elif elt['type'] == 'text/x-latex-code-bare':
+                # Use raw code
+                pages.append(code)
+                continue
             elif elt['type'] in ('text/x-latex-display', 'text/x-latex-code'):
                 if code.find(r'\tag') != -1:
                     code = code.replace(r'\tag', r'\postag')
@@ -273,7 +277,7 @@ class HTMLDoc:
             contents += LATEX_PREAMBLE
             contents += self.preamble
             contents += LATEX_BEGIN
-            contents += LATEX_NEWPAGE.join(pages)
+            contents += ''.join(pages)
             contents += r'\end{document}'
         # Now we know the hash file name
         self.html_cache = os.path.join(
