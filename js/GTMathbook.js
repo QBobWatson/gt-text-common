@@ -170,6 +170,18 @@
         if(!$("#toc a.active").length) {
             $("#toc h2.active a").addClass("active");
         }
+
+        $(".mathbook-content section.hidden-subsection > header > h1").on(
+            'click', function() {
+                var parent = $(this).parent().parent();
+                var child = parent.children(".hidden-subsection-content");
+                if(parent.hasClass("active")) {
+                    parent.removeClass("active");
+                } else {
+                    parent.addClass("active");
+                }
+                child.slideToggle(500);
+            });
     };
 
     // If script is run after page is loaded, initialize immediately

@@ -162,7 +162,26 @@ a > article.remark-like:after {
 }
 
 
-.mathbook-content .hidden-knowl-wrapper > a[knowl] > article:after {
+/* JDR: hidden subsection */
+.mathbook-content section.hidden-subsection > header > h1 {
+  border-bottom: 1px dotted #2a2222;
+}
+
+.mathbook-content section.hidden-subsection > header > h1:hover {
+  background: #fdf6e2;
+  cursor: pointer;
+}
+
+.mathbook-content .hidden-subsection-content {
+  display: none;
+}
+
+.mathbook-content section > .hidden-subsection-content > .hidden-knowl-wrapper {
+    margin-bottom: 1em;
+}
+
+.mathbook-content .hidden-knowl-wrapper > a[knowl] > article:after,
+.mathbook-content section.hidden-subsection > header > h1:after {
   border: solid black;
   border-width: 0 3px 3px 0;
   display: inline-block;
@@ -174,7 +193,8 @@ a > article.remark-like:after {
   content: '';
 }
 
-.mathbook-content .hidden-knowl-wrapper > a[knowl].active > article:after {
+.mathbook-content .hidden-knowl-wrapper > a[knowl].active > article:after,
+.mathbook-content section.hidden-subsection.active > header > h1:after {
   transform: translateX(-7px) translateY(0px) rotate(225deg);
   -webkit-transform: translateX(-7px) translateY(0px) rotate(225deg);
 }
