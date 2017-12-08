@@ -180,6 +180,11 @@ a > article.remark-like:after {
     margin-bottom: 1em;
 }
 
+/* JDR: No permalink for hidden subsection */
+.mathbook-content section.hidden-subsection header .heading a.permalink {
+  display: none;
+}
+
 .mathbook-content .hidden-knowl-wrapper > a[knowl] > article:after,
 .mathbook-content section.hidden-subsection > header > h1:after {
   border: solid black;
