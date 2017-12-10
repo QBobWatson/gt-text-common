@@ -7,7 +7,7 @@ First `cd` into `gt-text-common/pretex`.
 
 ```
 brew update
-brew install python2 python3 cairo py2cairo poppler
+brew install python2 python3 cairo py2cairo poppler pygobject
 brew tap caskroom/cask
 brew install caskroom/cask/fontforge
 brew install ./inkscape.rb
