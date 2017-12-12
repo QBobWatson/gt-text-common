@@ -1,26 +1,25 @@
 #!env python3
 
 import argparse
-import json
-import logging
 import os
 import re
 import sys
 from base64 import b64encode
 from hashlib import md5
+from io import StringIO
 from shutil import move
 from subprocess import Popen, PIPE
 from tempfile import TemporaryDirectory
 
-import cssutils
-from bs4 import BeautifulSoup
+from lxml import html
 
 import simpletransform
 
-cssutils.log.setLevel(logging.CRITICAL)
 
 BASE = os.path.dirname(__file__)
 TOUNICODE = os.path.join(BASE, 'tounicode.py')
+
+PID = os.getpid()
 
 import platform
 if platform.system() == 'Darwin':
@@ -28,6 +27,8 @@ if platform.system() == 'Darwin':
 else:
     FONTFORGE = 'fontforge'
 
+def log(text):
+    print("[{:6d}] {}".format(PID, text))
 
 # Snippet to tell fontforge to delete some empty lists.
 # Otherwise the Webkit CFF sanitizer balks.
@@ -174,6 +175,29 @@ def check_proc(proc, msg='', stdin=None):
         sys.exit(1)
     return out
 
+def css_to_dict(css_str):
+    "Simple parser."
+    # Won't handle complicated things like semicolons in strings.
+    ret = {}
+    for line in css_str.split(';'):
+        idx = line.find(':')
+        if idx == -1:
+            continue
+        key = line[:idx].strip()
+        val = line[idx+1:].strip()
+        if val[0] == "'" or val[0] == '"':
+            val = val[1:-1]
+        ret[key] = val
+    return ret
+
+def dict_to_css(css):
+    items = []
+    for key, val in css.items():
+        if val.find(' ') != -1:
+            val = "'" + val + "'"
+        items.append(key + ':' + val + ';')
+    return ';'.join(items)
+
 
 class HTMLDoc:
     """
@@ -182,14 +206,14 @@ class HTMLDoc:
 
     SVG_ATTRS = set(['viewBox', 'height', 'width', 'version'])
 
-    DEFAULT_TEXT = cssutils.parseStyle('''
+    DEFAULT_TEXT = css_to_dict('''
         writing-mode: lr-tb;
         fill:         #000;
         fill-opacity: 1;
         fill-rule:    nonzero;
         stroke:       none;
     ''')
-    DEFAULT_PATH = cssutils.parseStyle('''
+    DEFAULT_PATH = css_to_dict('''
         fill:              none;
         stroke:            #000;
         stroke-linecap:    butt;
@@ -203,7 +227,7 @@ class HTMLDoc:
         self.html_file = html_file
         with open(self.html_file) as fobj:
             self.html_data = fobj.read()
-        self.dom = BeautifulSoup(self.html_data, 'lxml')
+        self.dom = html.parse(StringIO(self.html_data))
         self.to_replace = []
         self.preamble = preamble
         self.basename = md5(self.html_data.encode()).hexdigest()
@@ -243,22 +267,24 @@ class HTMLDoc:
         "Extract math from the html file, then make a LaTeX file."
         self.to_replace = []
         pages = []
-        for elt in self.dom.find_all(
-                'script', type=re.compile('text/x-latex-.*')):
-            if not elt.string:
+        for elt in self.dom.getiterator('script'):
+            if not elt.attrib.get('type', '').startswith('text/x-latex-'):
                 continue
-            code = elt.string.strip()
-            if elt['type'] == 'text/x-latex-inline':
+            if not elt.text:
+                continue
+            code = elt.text.strip()
+            typ = elt.attrib['type']
+            if typ == 'text/x-latex-inline':
                 pages.append(LATEX_INLINE.format(code=code))
                 pages.append(LATEX_NEWPAGE)
-            elif elt['type'] == 'text/x-latex-code-inline':
+            elif typ == 'text/x-latex-code-inline':
                 pages.append(LATEX_CODE_INLINE.format(code=code))
                 pages.append(LATEX_NEWPAGE)
-            elif elt['type'] == 'text/x-latex-code-bare':
+            elif typ == 'text/x-latex-code-bare':
                 # Use raw code
                 pages.append(code)
                 continue
-            elif elt['type'] in ('text/x-latex-display', 'text/x-latex-code'):
+            elif typ in ('text/x-latex-display', 'text/x-latex-code'):
                 if code.find(r'\tag') != -1:
                     code = code.replace(r'\tag', r'\postag')
                 pages.append(LATEX_DISPLAY.format(code=code, pageno=len(pages)))
@@ -387,42 +413,51 @@ class HTMLDoc:
         self.font_hashes[name] = 'f'+md5(self.fonts[name]).hexdigest()[:4]
 
     def write_cache(self, style, fonts, svgs):
-        "Cache the computed data"
-        cache = {
-            'svgs'  : svgs,
-            'style' : style,
-            'fonts' : fonts,
-        }
-        with open(self.html_cache, 'w') as fobj:
-            json.dump(cache, fobj)
+        "Cache the computed data in an xml file"
+        cache = html.Element('cache')
+        elt = html.Element('style', id='pretex-style')
+        elt.text = style
+        cache.append(elt)
+        elt = html.Element('style', id='pretex-fonts')
+        elt.text = fonts
+        cache.append(elt)
+        for svg in svgs:
+            svg.tail = ''
+            cache.append(svg)
+        with open(self.html_cache, 'wb') as fobj:
+            fobj.write(html.tostring(cache))
 
     def use_cached(self, outfile):
         "Write the cached output to the html file."
-        with open(self.html_cache) as fobj:
-            cache = json.load(fobj)
+        with open(self.html_cache, 'rb') as fobj:
+            cache = html.fromstring(fobj.read())
+        style = cache[0].text
+        fonts = cache[1].text
         # Replace DOM elements
-        for i, elt in enumerate(self.to_replace):
-            root = BeautifulSoup(cache['svgs'][i], 'lxml')
-            root.html.unwrap()
-            root.body.unwrap()
-            elt.replace_with(root)
-        style_elt = self.dom.find(id='pretex-style')
-        if style_elt is not None:
-            style_elt.string = cache['style']
-        style_elt = self.dom.find(id='pretex-fonts')
-        if style_elt is not None:
-            style_elt.string = cache['fonts']
-        with open(outfile, 'w') as outf:
-            outf.write(str(self.dom))
+        for elt in self.to_replace:
+            svg = cache[2]
+            svg.tail = elt.tail
+            elt.getparent().replace(elt, svg)
+        root = self.dom.getroot()
+        try:
+            root.get_element_by_id('pretex-style').text = style
+        except KeyError:
+            pass
+        try:
+            root.get_element_by_id('pretex-fonts').text = fonts
+        except KeyError:
+            pass
+        with open(outfile, 'wb') as outf:
+            outf.write(html.tostring(self.dom))
 
     def write_html(self, outfile):
         svgs = self.process_svgs()
         cached_elts = []
         # Replace DOM elements
         for i, elt in enumerate(self.to_replace):
-            elt_str = str(svgs[i])
-            elt.replace_with(svgs[i])
-            cached_elts.append(elt_str)
+            svgs[i].tail = elt.tail
+            elt.getparent().replace(elt, svgs[i])
+            cached_elts.append(svgs[i])
         style = PRETEX_STYLE
         style += r'''
         svg.pretex text {{
@@ -431,10 +466,12 @@ class HTMLDoc:
         svg.pretex path {{
           {}
         }}
-        '''.format(self.DEFAULT_TEXT.cssText, self.DEFAULT_PATH.cssText)
-        style_elt = self.dom.find(id='pretex-style')
-        if style_elt is not None:
-            style_elt.string = style
+        '''.format(dict_to_css(self.DEFAULT_TEXT), dict_to_css(self.DEFAULT_PATH))
+        root = self.dom.getroot()
+        try:
+            root.get_element_by_id('pretex-style').text = style
+        except KeyError:
+            pass
         # Add fonts
         font_style = ''
         for name, data in self.fonts.items():
@@ -445,43 +482,41 @@ class HTMLDoc:
               src: url(data:application/font-woff;base64,{data}) format('woff');
             }}
             '''.format(name=name, data=b64encode(data).decode('ascii'))
-        style_elt = self.dom.find(id='pretex-fonts')
-        if style_elt is not None:
-            style_elt.string = font_style
-        with open(outfile, 'w') as outf:
-            outf.write(str(self.dom))
+        try:
+            root.get_element_by_id('pretex-fonts').text = font_style
+        except KeyError:
+            pass
+        with open(outfile, 'wb') as outf:
+            outf.write(html.tostring(self.dom))
         self.write_cache(style, font_style, cached_elts)
 
     def process_svgs(self):
         "Process all generated svgs file for use in an html page."
         svgs = []
         for page_num, page_extents in enumerate(self.pages_extents):
-            with open(self.svg_file(page_num)) as fobj:
-                # If bs4 sees a namespace it generates prefixed tags
-                lines = [line for line in fobj if line.find('xmlns=') == -1]
-                soup = BeautifulSoup(''.join(lines), 'lxml')
-            elt = soup.svg
+            with open(self.svg_file(page_num), 'rb') as fobj:
+                svg = html.fromstring(fobj.read())
             # Remove extra attrs from <svg>
-            for key in list(elt.attrs.keys()):
+            for key in svg.attrib.keys():
                 if key not in self.SVG_ATTRS:
-                    del elt[key]
+                    del svg.attrib[key]
             # Auto-calculated based on height and viewBox aspect ratio
-            del elt['width']
-            elt['class'] = 'pretex'
+            del svg.attrib['width']
+            svg.attrib['class'] = 'pretex'
             # Get rid of metadata
-            try:
-                elt.metadata.decompose()
-            except AttributeError:
-                pass
+            metadata = svg.find('metadata')
+            if metadata is not None:
+                svg.remove(metadata)
             # Get rid of empty defs
-            if not elt.defs.find_all():
-                elt.defs.decompose()
+            defs = svg.find('defs')
+            if defs is not None and len(defs) == 0:
+                svg.remove(defs)
             # Undo global page coordinate transforms
-            units_in_pt = unwrap_transforms(elt)
+            units_in_pt = unwrap_transforms(svg)
             # Plug in actual size data
             if page_extents['display']:
                 scale = 72/96 if units_in_pt else 1
-                elt['viewBox'] = '{} {} {} {}'.format(
+                svg.attrib['viewBox'] = '{} {} {} {}'.format(
                     scale * page_extents['left'],
                     scale * page_extents['top'],
                     scale * page_extents['width'],
@@ -489,77 +524,78 @@ class HTMLDoc:
                 )
                 # The height is 1em.  The fonts in the pdf file are relative to
                 # fontsize.
-                elt['height'] = '{}em'.format(page_extents['heightem'])
+                svg.attrib['height'] = '{}em'.format(page_extents['heightem'])
             else:
                 scale = 1 if units_in_pt else 96/72
                 # The size of the view box doesn't matter, since the wrapper and
                 # the strut take care of spacing.  Set it to a 1em square.
-                elt['viewBox'] = '0 -{fs} {fs} {fs}'.format(
+                svg.attrib['viewBox'] = '0 -{fs} {fs} {fs}'.format(
                     fs=page_extents['fontsize']*(
                         1 if units_in_pt else 96/72))
                 # height is 1em; it is set in css
-                del elt['height']
+                del svg.attrib['height']
             # Get rid of ids
-            for elt2 in elt.find_all(id=True):
-                if not elt2.find_parents("defs"):
-                    del elt2['id']
+            for elt in svg.xpath('//*[@id]'):
+                if not elt.xpath("ancestor::defs"):
+                    del elt.attrib['id']
             # Clean up text styles
-            for tspan in elt.find_all('tspan', style=True):
+            for tspan in svg.xpath('//tspan[@style]'):
                 self.process_tspan(tspan, page_extents['fontsize'])
             # Clean up path styles
-            for path in elt.find_all('path', style=True):
+            for path in svg.xpath('//path[@style]'):
                 self.process_path(path)
             # Process linked images
-            for img in elt.find_all('image'):
+            for img in svg.xpath('//image'):
                 self.process_image(img)
             if page_extents['display']:
                 # Wrap displayed equations
-                elt = elt.wrap(soup.new_tag('div'))
-                elt['class'] = 'pretex-display'
+                div = html.Element('div', {'class' : 'pretex-display'})
+                div.append(svg)
+                svg = div
                 # Add tags
                 for contents, pos in page_extents['tags']:
-                    tagelt = soup.new_tag('span')
-                    tagelt['class'] = 'tag'
-                    tagelt.string = '('+contents+')'
+                    tagelt = html.Element('span', {'class' : 'tag'})
+                    tagelt.text = '('+contents+')'
                     # This moves the tag down the calculated amount
-                    htelt = soup.new_tag('span')
-                    htelt['style'] = 'height:{}em'.format(
-                        pos / page_extents['fontsize'])
+                    htelt = html.Element('span', style='height:{}em'.format(
+                        pos / page_extents['fontsize']))
                     tagelt.append(htelt)
-                    elt.append(tagelt)
+                    svg.append(tagelt)
             else:
                 # After much experimentation, this seems to be the most reliable
                 # way to lock the origin of the svg to the baseline.
-                wrapper = soup.new_tag('span')
-                wrapper['class'] = 'pretex-inline'
-                wrapper['style'] = 'width:{}em'.format(page_extents['widthem'])
-                elt.wrap(wrapper)
+                wrapper = html.Element('span', {
+                    'class' : 'pretex-inline',
+                    'style' : 'width:{}em'.format(page_extents['widthem']),
+                })
                 # make strut
                 style = 'height:{}em'.format(
                     page_extents['heightem'] + page_extents['depthem'])
                 if page_extents['depthem'] > 0.0:
                     style += ';vertical-align:-{}em'.format(
                         page_extents['depthem'])
-                elt.insert_before(soup.new_tag('span', style=style))
+                wrapper.append(html.Element('span', style=style))
                 # This last span is relatively positioned.  Its size will be
                 # 0x0, so it sits right on the baseline.  The bottom of the svg
                 # is then absolutely positioned to that.
-                elt.wrap(soup.new_tag('span'))
-                elt = wrapper
-            svgs.append(elt)
+                elt = html.Element('span')
+                wrapper.append(elt)
+                elt.append(svg)
+                svg = wrapper
+            svgs.append(svg)
         return svgs
 
     def process_tspan(self, tspan, page_font_size):
         "Simplify <tspan> tag."
-        css = cssutils.parseStyle(tspan['style'])
+        css = css_to_dict(tspan.attrib.get('style', ''))
         # These are hard-coded into the font, but not marked as such
-        del css['font-variant']
-        del css['font-weight']
-        del css['font-style']
-        del css['-inkscape-font-specification']
+        css.pop('font-variant', 1)
+        css.pop('font-weight', 1)
+        css.pop('font-style', 1)
+        css.pop('-inkscape-font-specification', 1)
         # Get rid of inherited styles
-        for key in self.DEFAULT_TEXT.keys():
-            if css[key] == self.DEFAULT_TEXT[key]:
+        for key in self.DEFAULT_TEXT:
+            if key in css and css[key] == self.DEFAULT_TEXT[key]:
                 del css[key]
         if 'font-size' in css:
             match = re.match(r'([\d\.]+).*', css['font-size'])
@@ -568,30 +604,31 @@ class HTMLDoc:
                 # It's using the default font size
                 del css['font-size']
         # Replace font-family with font number (save space)
-        font_family = css.getPropertyCSSValue('font-family')
-        if font_family[0]:
-            font_family = font_family[0].value
-        if font_family in self.font_hashes:
-            css['font-family'] = self.font_hashes[font_family]
-        tspan['style'] = css.cssText
-        if not tspan['style']:
-            del tspan['style']
+        if 'font-family' in css:
+            font_family = css['font-family'].split(',')
+            if font_family and font_family[0]:
+                font_family = font_family[0]
+                if font_family in self.font_hashes:
+                    css['font-family'] = self.font_hashes[font_family]
+        tspan.attrib['style'] = dict_to_css(css)
+        if not tspan.attrib['style']:
+            del tspan.attrib['style']
 
     def process_path(self, path):
         "Simplify <path> tag."
-        css = cssutils.parseStyle(path['style'])
+        css = css_to_dict(path.attrib.get('style', ''))
         # Get rid of inherited styles
-        for key in self.DEFAULT_PATH.keys():
-            if css[key] == self.DEFAULT_PATH[key]:
+        for key in self.DEFAULT_PATH:
+            if key in css and css[key] == self.DEFAULT_PATH[key]:
                 del css[key]
-        path['style'] = css.cssText
-        if not path['style']:
-            del path['style']
+        path.attrib['style'] = dict_to_css(css)
+        if not path.attrib['style']:
+            del path.attrib['style']
 
     def process_image(self, img):
         "Simplify <image> tag."
-        href = img['xlink:href']
-        del img['xlink:href']
+        href = img.attrib['xlink:href']
+        del img.attrib['xlink:href']
         # Inkscape has no idea where the file ended up
         fname = os.path.join(self.out_img_dir, os.path.basename(href))
         # Cache the image by a hash of its content
@@ -599,15 +636,15 @@ class HTMLDoc:
             img_hash = md5(fobj.read()).hexdigest()
         img_name = img_hash + '.png'
         self.images.append(img_name)
-        img['href'] = FIGURE_IMG_DIR + '/' + img_name
+        img.attrib['href'] = FIGURE_IMG_DIR + '/' + img_name
         # Move to the cache directory
         move(fname, os.path.join(self.cache_dir, img_name))
         # Simplify css
-        css = cssutils.parseStyle(img['style'])
-        del css['image-rendering']
-        img['style'] = css.cssText
-        if not img['style']:
-            del img['style']
+        css = css_to_dict(img.get('style', ''))
+        css.pop('image-rendering', 1)
+        img.attrib['style'] = dict_to_css(css)
+        if not img.attrib['style']:
+            del img.attrib['style']
 
 
 def almost_zero(num, ε=0.0001):
@@ -643,8 +680,8 @@ def smart_round(num, decimals=8):
 
 def simplify_transforms(svg):
     'Re-format transform attributes to save characters.'
-    for elt in svg.find_all(transform=True):
-        mat = simpletransform.parse_transform(elt['transform'])
+    for elt in svg.xpath('//*[@transform]'):
+        mat = simpletransform.parse_transform(elt.attrib['transform'])
         # Recognize identity / translation
         if (almost_zero(mat[0][0] - 1) and
             almost_zero(mat[1][1] - 1) and
@@ -652,12 +689,12 @@ def simplify_transforms(svg):
             almost_zero(mat[1][0])):
             if almost_zero(mat[1][2]):
                 if almost_zero(mat[0][2]):
-                    del elt['transform']
+                    del elt.attrib['transform']
                     continue
-                elt['transform'] = 'translate({})'.format(
+                elt.attrib['transform'] = 'translate({})'.format(
                     smart_round(mat[0][2]))
                 continue
-            elt['transform'] = 'translate({} {})'.format(
+            elt.attrib['transform'] = 'translate({} {})'.format(
                 smart_round(mat[0][2]), smart_round(mat[1][2]))
             continue
         # Recognize scale
@@ -666,28 +703,28 @@ def simplify_transforms(svg):
             almost_zero(mat[1][0]) and
             almost_zero(mat[1][2])):
             if almost_zero(mat[0][0] - mat[1][1]):
-                elt['transform'] = 'scale({})'.format(
+                elt.attrib['transform'] = 'scale({})'.format(
                     smart_round(mat[0][0]))
                 continue
-            elt['transform'] = 'scale({} {})'.format(
+            elt.attrib['transform'] = 'scale({} {})'.format(
                 smart_round(mat[0][0]), smart_round(mat[1][1]))
             continue
-        elt['transform'] = "matrix({},{},{},{},{},{})".format(
+        elt.attrib['transform'] = "matrix({},{},{},{},{},{})".format(
             smart_round(mat[0][0]), smart_round(mat[1][0]),
             smart_round(mat[0][1]), smart_round(mat[1][1]),
             smart_round(mat[0][2]), smart_round(mat[1][2]))
 
 def unwrap_transforms(svg):
     'Undo global coordinate transformation, if there is one.'
-    groups = svg.find_all('g', recursive=False)
+    groups = svg.findall('g')
     if len(groups) != 1:
         return False
     group = groups[0]
-    if not set(group.attrs.keys()) <= {'id', 'transform'}:
+    if not set(group.attrib.keys()) <= {'id', 'transform'}:
         return False
-    if not group.get('transform'):
+    if not group.attrib.get('transform'):
         return False
-    mat = simpletransform.parse_transform(group['transform'])
+    mat = simpletransform.parse_transform(group.attrib['transform'])
     # Recognize pdf coordinate transformation
     if not (almost_zero(mat[0][0] - 4/3) and
             almost_zero(mat[1][1] + 4/3) and
@@ -696,10 +733,12 @@ def unwrap_transforms(svg):
             almost_zero(mat[0][2])):
         return False
     mat = [[1, 0, 0], [0, -1, mat[1][2]*3/4]]
-    for child in group.find_all(recursive=False):
-        child_mat = simpletransform.parse_transform(child.get('transform'), mat)
-        child['transform'] = simpletransform.format_transform(child_mat)
-    group.unwrap()
+    for child in group:
+        child_mat = simpletransform.parse_transform(
+            child.attrib.get('transform', ''), mat)
+        child.attrib['transform'] = simpletransform.format_transform(child_mat)
+        svg.append(child)
+    svg.remove(group)
     simplify_transforms(svg)
     return True
 
@@ -736,7 +775,8 @@ def main():
                       for html in args.htmls]
 
         # Create pdf files
-        print("Extracting code and running LaTeX...")
+        log("Processing {} files".format(len(html_files)))
+        log("Extracting code and running LaTeX...")
         done = set()
         for html in html_files:
             if not html.make_latex():
@@ -748,16 +788,17 @@ def main():
                 done.add(html)
                 continue
             else:
-                print("(Re)processing {}".format(
+                log("(Re)processing {}".format(
                     os.path.basename(html.html_file)))
                 html.latex()
         html_files = [h for h in html_files if h not in done]
         if not html_files:
+            log("Done!")
             return
         pdf_files = [html.pdf_file for html in html_files]
         html_byhash = {html.basename : html for html in html_files}
 
-        print("Adding unicode codepoints to fonts...")
+        log("Adding unicode codepoints to fonts...")
         # Add unicode codepoints to fonts in all pdf files
         sfd_dir = os.path.join(tmpdir, 'sfd')
         os.makedirs(sfd_dir, exist_ok=True)
@@ -769,7 +810,7 @@ def main():
             html.read_extents()
 
         # Convert all fonts
-        print("Converting fonts to woff format...")
+        log("Converting fonts to woff format...")
         woff_dir = os.path.join(tmpdir, 'woff')
         os.makedirs(woff_dir, exist_ok=True)
         script = []
@@ -805,7 +846,7 @@ def main():
                 font_name.replace('+', ' '), os.path.join(woff_dir, fname))
 
         # Convert all pages of all pdf files to svg files
-        print("Generating svg files...")
+        log("Generating svg files...")
         # inkscape exports images to the current directory
         img_dir = os.path.join(tmpdir, 'img')
         os.makedirs(img_dir, exist_ok=True)
@@ -816,9 +857,10 @@ def main():
         check_proc(proc, "SVG conversion failed", script)
 
         # Process svg files and write html
-        print("Writing html files...")
+        log("Writing html files...")
         for html in html_files:
             html.write_html(html.html_file)
+        log("Done!")
 
 
 if __name__ == "__main__":
