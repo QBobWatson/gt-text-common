@@ -114,6 +114,9 @@ LATEX_DISPLAY = r'''%
 '''
 
 PRETEX_STYLE = '''
+.pretex-bind {
+  display: inline-block;
+}
 .pretex-inline {
   display: inline-block;
 }
@@ -427,6 +430,42 @@ class HTMLDoc:
         with open(self.html_cache, 'wb') as fobj:
             fobj.write(html.tostring(cache))
 
+    def _replace_elt(self, elt, svg):
+        "Replace an element with an svg, using a binding wrapper if necessary."
+        # The code below is to prevent a line break occurring between an
+        # equation and an adjacent piece of text, like "ith" or "(and f(x))".
+        if svg.attrib['class'] == 'pretex-inline':
+            head_text = ''
+            tail_text = elt.tail
+            need_wrap = False
+            if elt.tail and not elt.tail[0].isspace():
+                match = re.match(r'(\S+)(.*)', elt.tail)
+                svg.tail, tail_text = match.groups()
+                need_wrap = True
+            # Figure out what text came right before this element
+            prev = elt.getprevious()
+            parent = elt.getparent()
+            if prev is not None and prev.tail and not prev.tail[-1].isspace():
+                match = re.match(r'(.*\s)?(\S+)', prev.tail)
+                unbound, head_text = match.groups()
+                prev.tail = unbound or ''
+                need_wrap = True
+            elif prev is None and parent.text and not parent.text[-1].isspace():
+                match = re.match(r'(.*\s)?(\S+)', parent.text)
+                unbound, head_text = match.groups()
+                parent.text = unbound or ''
+                need_wrap = True
+            if need_wrap:
+                # Wrap in a binding span
+                wrapper = html.Element('span', {'class' : 'pretex-bind'})
+                wrapper.text = head_text
+                wrapper.append(svg)
+                wrapper.tail = tail_text
+                svg = wrapper
+            else:
+                svg.tail = tail_text
+        elt.getparent().replace(elt, svg)
+
     def use_cached(self, outfile):
         "Write the cached output to the html file."
         with open(self.html_cache, 'rb') as fobj:
@@ -436,8 +475,7 @@ class HTMLDoc:
         # Replace DOM elements
         for elt in self.to_replace:
             svg = cache[2]
-            svg.tail = elt.tail
-            elt.getparent().replace(elt, svg)
+            self._replace_elt(elt, svg)
         root = self.dom.getroot()
         try:
             root.get_element_by_id('pretex-style').text = style
@@ -455,8 +493,7 @@ class HTMLDoc:
         cached_elts = []
         # Replace DOM elements
         for i, elt in enumerate(self.to_replace):
-            svgs[i].tail = elt.tail
-            elt.getparent().replace(elt, svgs[i])
+            self._replace_elt(elt, svgs[i])
             cached_elts.append(svgs[i])
         style = PRETEX_STYLE
         style += r'''
