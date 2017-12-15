@@ -1,5 +1,8 @@
 #!env python3
 
+# TODO: empty groups
+
+
 import argparse
 import os
 import re
@@ -190,6 +193,9 @@ def css_to_dict(css_str):
         val = line[idx+1:].strip()
         if val[0] == "'" or val[0] == '"':
             val = val[1:-1]
+        else:
+            # Assume whitespace is unimportant in unquoted values
+            val = val.replace(' ', '')
         ret[key] = val
     return ret
 
@@ -198,8 +204,11 @@ def dict_to_css(css):
     for key, val in css.items():
         if val.find(' ') != -1:
             val = "'" + val + "'"
-        items.append(key + ':' + val + ';')
+        items.append(key + ':' + val)
     return ';'.join(items)
+
+def smart_float(num, decimals=5):
+    return format(num, "." + str(decimals) + 'f').rstrip('0').rstrip('.')
 
 
 class HTMLDoc:
@@ -211,14 +220,16 @@ class HTMLDoc:
 
     DEFAULT_TEXT = css_to_dict('''
         writing-mode: lr-tb;
-        fill:         #000;
-        fill-opacity: 1;
+        fill:         #000000;
         fill-rule:    nonzero;
+        fill-opacity: 1;
         stroke:       none;
     ''')
     DEFAULT_PATH = css_to_dict('''
         fill:              none;
-        stroke:            #000;
+        fill-rule:         nonzero;
+        fill-opacity:      1;
+        stroke:            #000000;
         stroke-linecap:    butt;
         stroke-linejoin:   miter;
         stroke-miterlimit: 10;
@@ -485,6 +496,9 @@ class HTMLDoc:
             root.get_element_by_id('pretex-fonts').text = fonts
         except KeyError:
             pass
+        for elt in self.dom.getiterator('script'):
+            if elt.attrib.get('type', '').startswith('text/x-latex-code-bare'):
+                elt.getparent().remove(elt)
         with open(outfile, 'wb') as outf:
             outf.write(html.tostring(self.dom))
 
@@ -502,8 +516,8 @@ class HTMLDoc:
         }}
         svg.pretex path {{
           {}
-        }}
-        '''.format(dict_to_css(self.DEFAULT_TEXT), dict_to_css(self.DEFAULT_PATH))
+        }}'''.format(
+            dict_to_css(self.DEFAULT_TEXT), dict_to_css(self.DEFAULT_PATH))
         root = self.dom.getroot()
         try:
             root.get_element_by_id('pretex-style').text = style
@@ -517,12 +531,14 @@ class HTMLDoc:
             @font-face {{
               font-family: "{name}";
               src: url(data:application/font-woff;base64,{data}) format('woff');
-            }}
-            '''.format(name=name, data=b64encode(data).decode('ascii'))
+            }}'''.format(name=name, data=b64encode(data).decode('ascii'))
         try:
             root.get_element_by_id('pretex-fonts').text = font_style
         except KeyError:
             pass
+        for elt in self.dom.getiterator('script'):
+            if elt.attrib.get('type', '').startswith('text/x-latex-code-bare'):
+                elt.getparent().remove(elt)
         with open(outfile, 'wb') as outf:
             outf.write(html.tostring(self.dom))
         self.write_cache(style, font_style, cached_elts)
@@ -554,21 +570,22 @@ class HTMLDoc:
             if page_extents['display']:
                 scale = 72/96 if units_in_pt else 1
                 svg.attrib['viewBox'] = '{} {} {} {}'.format(
-                    scale * page_extents['left'],
-                    scale * page_extents['top'],
-                    scale * page_extents['width'],
-                    scale * page_extents['height']
+                    smart_float(scale * page_extents['left']),
+                    smart_float(scale * page_extents['top']),
+                    smart_float(scale * page_extents['width']),
+                    smart_float(scale * page_extents['height'])
                 )
                 # The height is 1em.  The fonts in the pdf file are relative to
                 # fontsize.
-                svg.attrib['height'] = '{}em'.format(page_extents['heightem'])
+                svg.attrib['height'] = '{}em'.format(
+                    smart_float(page_extents['heightem']))
             else:
                 scale = 1 if units_in_pt else 96/72
                 # The size of the view box doesn't matter, since the wrapper and
                 # the strut take care of spacing.  Set it to a 1em square.
                 svg.attrib['viewBox'] = '0 -{fs} {fs} {fs}'.format(
-                    fs=page_extents['fontsize']*(
-                        1 if units_in_pt else 96/72))
+                    fs=smart_float(page_extents['fontsize']*(
+                        1 if units_in_pt else 96/72)))
                 # height is 1em; it is set in css
                 del svg.attrib['height']
             # Get rid of ids
@@ -584,6 +601,16 @@ class HTMLDoc:
             # Process linked images
             for img in svg.xpath('//image'):
                 self.process_image(img)
+            # Delete empty groups (recursively)
+            todelete = svg.xpath('//g[count(*)=0]')
+            while todelete:
+                todelete2 = list(todelete)
+                todelete = []
+                for elt in todelete2:
+                    parent = elt.getparent()
+                    parent.remove(elt)
+                    if parent.tag == 'g' and len(parent) == 0:
+                        todelete.append(parent)
             if page_extents['display']:
                 # Wrap displayed equations
                 div = html.Element('div', {'class' : 'pretex-display'})
@@ -595,7 +622,7 @@ class HTMLDoc:
                     tagelt.text = '('+contents+')'
                     # This moves the tag down the calculated amount
                     htelt = html.Element('span', style='height:{}em'.format(
-                        pos / page_extents['fontsize']))
+                        smart_float(pos / page_extents['fontsize'])))
                     tagelt.append(htelt)
                     svg.append(tagelt)
             else:
@@ -603,14 +630,16 @@ class HTMLDoc:
                 # way to lock the origin of the svg to the baseline.
                 wrapper = html.Element('span', {
                     'class' : 'pretex-inline',
-                    'style' : 'width:{}em'.format(page_extents['widthem']),
+                    'style' : 'width:{}em'.format(
+                        smart_float(page_extents['widthem'])),
                 })
                 # make strut
                 style = 'height:{}em'.format(
-                    page_extents['heightem'] + page_extents['depthem'])
+                    smart_float(page_extents['heightem'] +
+                                page_extents['depthem']))
                 if page_extents['depthem'] > 0.0:
                     style += ';vertical-align:-{}em'.format(
-                        page_extents['depthem'])
+                        smart_float(page_extents['depthem']))
                 wrapper.append(html.Element('span', style=style))
                 # This last span is relatively positioned.  Its size will be
                 # 0x0, so it sits right on the baseline.  The bottom of the svg
@@ -658,6 +687,8 @@ class HTMLDoc:
         for key in self.DEFAULT_PATH:
             if key in css and css[key] == self.DEFAULT_PATH[key]:
                 del css[key]
+        if css.get('fill') == '#000000':
+            css['fill'] = '#000'
         path.attrib['style'] = dict_to_css(css)
         if not path.attrib['style']:
             del path.attrib['style']
@@ -710,9 +741,9 @@ def smart_round(num, decimals=8):
             approx1 /= 10.0
             approx2 /= 10.0
         if num - approx1 < error:
-            return ("{:." + str(i) + "f}").format(neg * approx1)
+            return format(neg * approx1, "." + str(i) + "f")
         if approx2 - num < error:
-            return ("{:." + str(i) + "f}").format(neg * approx2)
+            return format(neg * approx2, "." + str(i) + "f")
     return neg * num
 
 def simplify_transforms(svg):
