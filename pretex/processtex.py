@@ -272,7 +272,8 @@ class HTMLDoc:
         self.html_file = html_file
         with open(self.html_file) as fobj:
             self.html_data = fobj.read()
-        self.dom = html.parse(StringIO(self.html_data))
+        parser = html.HTMLParser(remove_comments=True)
+        self.dom = html.parse(StringIO(self.html_data), parser=parser)
         self.to_replace = []
         self.preamble = preamble
         self.basename = md5(self.html_data.encode()).hexdigest()
@@ -533,7 +534,8 @@ class HTMLDoc:
             if elt.attrib.get('type', '').startswith('text/x-latex-code-bare'):
                 elt.getparent().remove(elt)
         with open(outfile, 'wb') as outf:
-            outf.write(html.tostring(self.dom))
+            outf.write(html.tostring(
+                self.dom, include_meta_content_type=True, encoding='utf-8'))
 
     def write_html(self, outfile):
         svgs = self.process_svgs()
@@ -575,7 +577,8 @@ class HTMLDoc:
             if elt.attrib.get('type', '').startswith('text/x-latex-code-bare'):
                 elt.getparent().remove(elt)
         with open(outfile, 'wb') as outf:
-            outf.write(html.tostring(self.dom))
+            outf.write(html.tostring(
+                self.dom, include_meta_content_type=True, encoding='utf-8'))
         self.write_cache(style, font_style, cached_elts)
 
     def process_svgs(self):
