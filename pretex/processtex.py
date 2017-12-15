@@ -210,6 +210,12 @@ def dict_to_css(css):
 def smart_float(num, decimals=5):
     return format(num, "." + str(decimals) + 'f').rstrip('0').rstrip('.')
 
+# Encoding an md5 digest in base64 instead of hex reduces length from 32 to 20
+def b64_hash(text):
+    if not isinstance(text, bytes):
+        text = text.encode()
+    return b64encode(md5(text).digest()[:15], b'-_').decode('ascii')
+
 
 class CSSClasses:
     """
@@ -218,22 +224,13 @@ class CSSClasses:
     It saves space to use css classes with short names for these.  This class
     acts as a repository for such css classes.
     """
-    ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
     def __init__(self):
         self.class_names = {}
         self.class_vals = {}
-    def _num_to_str(self, number):
-        if 0 <= number < len(self.ALPHABET):
-            return self.ALPHABET[number]
-        text = ''
-        while number != 0:
-            number, i = divmod(number, len(self.ALPHABET))
-            text = self.ALPHABET[i] + text
-        return text
     def get(self, val):
         if val in self.class_vals:
             return self.class_vals[val]
-        class_name = self._num_to_str(len(self.class_names))
+        class_name = 'c' + b64_hash(val)[:4]
         self.class_names[class_name] = val
         self.class_vals[val] = class_name
         return class_name
@@ -276,7 +273,7 @@ class HTMLDoc:
         self.dom = html.parse(StringIO(self.html_data), parser=parser)
         self.to_replace = []
         self.preamble = preamble
-        self.basename = md5(self.html_data.encode()).hexdigest()
+        self.basename = b64_hash(self.html_data)
         self.base_dir = os.path.join(tmp_dir, self.basename)
         self.pdf_dir = os.path.join(self.base_dir, 'pdf')
         self.svg_dir = os.path.join(self.base_dir, 'svg')
@@ -355,8 +352,7 @@ class HTMLDoc:
             contents += ''.join(pages)
             contents += r'\end{document}'
         # Now we know the hash file name
-        self.html_cache = os.path.join(
-            self.cache_dir, md5(contents.encode()).hexdigest())
+        self.html_cache = os.path.join(self.cache_dir, b64_hash(contents))
         self.contents = contents
         return True
 
@@ -458,7 +454,7 @@ class HTMLDoc:
     def add_font(self, name, fname):
         with open(fname, 'rb') as fobj:
             self.fonts[name] = fobj.read()
-        self.font_hashes[name] = 'f'+md5(self.fonts[name]).hexdigest()
+        self.font_hashes[name] = 'f'+b64_hash(self.fonts[name])[:4]
 
     def write_cache(self, style, fonts, svgs):
         "Cache the computed data in an xml file"
@@ -553,8 +549,6 @@ class HTMLDoc:
           {}
         }}'''.format(
             dict_to_css(self.DEFAULT_TEXT), dict_to_css(self.DEFAULT_PATH))
-        style += self.tspan_classes.css('svg.pretex tspan')
-        style += self.path_classes.css('svg.pretex path')
         root = self.dom.getroot()
         try:
             root.get_element_by_id('pretex-style').text = style
@@ -569,6 +563,11 @@ class HTMLDoc:
               font-family: "{name}";
               src: url(data:application/font-woff;base64,{data}) format('woff');
             }}'''.format(name=name, data=b64encode(data).decode('ascii'))
+        # These go here so they show up in knowls too
+        font_style += self.tspan_classes.css('svg.pretex tspan')
+        font_style += self.path_classes.css('svg.pretex path')
+        font_style += ''.join('svg.pretex tspan.' + h + '{font-family:' + h + '}'
+                              for h in self.font_hashes.values())
         try:
             root.get_element_by_id('pretex-fonts').text = font_style
         except KeyError:
@@ -721,8 +720,7 @@ class HTMLDoc:
             if font_family and font_family[0]:
                 font_family = font_family[0]
                 if font_family in self.font_hashes:
-                    classes.append(self.tspan_classes.get(
-                        'font-family:'+self.font_hashes[font_family]))
+                    classes.append(self.font_hashes[font_family])
                 else:
                     classes.append(self.tspan_classes.get(
                         'font-family:'+font_family))
@@ -764,7 +762,7 @@ class HTMLDoc:
         fname = os.path.join(self.out_img_dir, os.path.basename(href))
         # Cache the image by a hash of its content
         with open(fname, 'rb') as fobj:
-            img_hash = md5(fobj.read()).hexdigest()
+            img_hash = b64_hash(fobj.read())
         img_name = img_hash + '.png'
         self.images.append(img_name)
         img.attrib['href'] = FIGURE_IMG_DIR + '/' + img_name
