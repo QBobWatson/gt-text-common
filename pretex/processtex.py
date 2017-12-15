@@ -211,6 +211,37 @@ def smart_float(num, decimals=5):
     return format(num, "." + str(decimals) + 'f').rstrip('0').rstrip('.')
 
 
+class CSSClasses:
+    """
+    Some style attributes, like stroke-width, font-size, and font-family,
+    require many characters to specify, despite there being few unique values.
+    It saves space to use css classes with short names for these.  This class
+    acts as a repository for such css classes.
+    """
+    ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    def __init__(self):
+        self.class_names = {}
+        self.class_vals = {}
+    def _num_to_str(self, number):
+        if 0 <= number < len(self.ALPHABET):
+            return self.ALPHABET[number]
+        text = ''
+        while number != 0:
+            number, i = divmod(number, len(self.ALPHABET))
+            text = self.ALPHABET[i] + text
+        return text
+    def get(self, val):
+        if val in self.class_vals:
+            return self.class_vals[val]
+        class_name = self._num_to_str(len(self.class_names))
+        self.class_names[class_name] = val
+        self.class_vals[val] = class_name
+        return class_name
+    def css(self, prefix):
+        return ''.join(prefix + '.' + name + '{' + val + '}'
+                       for name,val in self.class_names.items()) + '\n'
+
+
 class HTMLDoc:
     """
     Stores all data needed to convert the LaTeX in an html file.
@@ -269,6 +300,8 @@ class HTMLDoc:
         self.images = []
         self.contents = ''
         self.html_cache = None
+        self.path_classes = CSSClasses()
+        self.tspan_classes = CSSClasses()
 
     @property
     def is_cached(self):
@@ -424,7 +457,7 @@ class HTMLDoc:
     def add_font(self, name, fname):
         with open(fname, 'rb') as fobj:
             self.fonts[name] = fobj.read()
-        self.font_hashes[name] = 'f'+md5(self.fonts[name]).hexdigest()[:4]
+        self.font_hashes[name] = 'f'+md5(self.fonts[name]).hexdigest()
 
     def write_cache(self, style, fonts, svgs):
         "Cache the computed data in an xml file"
@@ -518,6 +551,8 @@ class HTMLDoc:
           {}
         }}'''.format(
             dict_to_css(self.DEFAULT_TEXT), dict_to_css(self.DEFAULT_PATH))
+        style += self.tspan_classes.css('svg.pretex tspan')
+        style += self.path_classes.css('svg.pretex path')
         root = self.dom.getroot()
         try:
             root.get_element_by_id('pretex-style').text = style
@@ -663,22 +698,37 @@ class HTMLDoc:
         for key in self.DEFAULT_TEXT:
             if key in css and css[key] == self.DEFAULT_TEXT[key]:
                 del css[key]
+        # Add classes to save space
+        classes = []
+        if 'class' in tspan.attrib:
+            classes = tspan.attrib['class'].split(' ')
         if 'font-size' in css:
             match = re.match(r'([\d\.]+).*', css['font-size'])
             size = float(match.group(1))
             if abs(size - page_font_size) <= .001:
                 # It's using the default font size
                 del css['font-size']
-        # Replace font-family with font number (save space)
+            else:
+                classes.append(self.tspan_classes.get(
+                    'font-size:'+css['font-size']))
+                del css['font-size']
+        # Replace font-family with a class (save space)
         if 'font-family' in css:
             font_family = css['font-family'].split(',')
             if font_family and font_family[0]:
                 font_family = font_family[0]
                 if font_family in self.font_hashes:
-                    css['font-family'] = self.font_hashes[font_family]
+                    classes.append(self.tspan_classes.get(
+                        'font-family:'+self.font_hashes[font_family]))
+                else:
+                    classes.append(self.tspan_classes.get(
+                        'font-family:'+font_family))
+                del css['font-family']
         tspan.attrib['style'] = dict_to_css(css)
         if not tspan.attrib['style']:
             del tspan.attrib['style']
+        if classes:
+            tspan.attrib['class'] = ' '.join(classes)
 
     def process_path(self, path):
         "Simplify <path> tag."
@@ -689,9 +739,19 @@ class HTMLDoc:
                 del css[key]
         if css.get('fill') == '#000000':
             css['fill'] = '#000'
+        # Add classes to save space
+        classes = []
+        if 'class' in path.attrib:
+            classes = path.attrib['class'].split(' ')
+        if 'stroke-width' in css:
+            classes.append(self.path_classes.get(
+                'stroke-width:'+css['stroke-width']))
+            del css['stroke-width']
         path.attrib['style'] = dict_to_css(css)
         if not path.attrib['style']:
             del path.attrib['style']
+        if classes:
+            path.attrib['class'] = ' '.join(classes)
 
     def process_image(self, img):
         "Simplify <image> tag."
