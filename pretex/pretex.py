@@ -7,6 +7,7 @@ import argparse
 import os
 
 from multiprocessing import Pool, cpu_count
+from random import shuffle
 from subprocess import Popen
 
 
@@ -52,6 +53,9 @@ def main():
     parser.add_argument('htmls', type=str, nargs='+',
                         help='HTML files to process')
     args = parser.parse_args()
+
+    # Process in a random order.  Otherwise one process gets all the section files.
+    shuffle(args.htmls)
 
     with Pool(processes=cpu_count()-1) as pool:
         job_args = []
