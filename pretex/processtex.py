@@ -1,8 +1,5 @@
 #!env python3
 
-# TODO: empty groups
-
-
 import argparse
 import os
 import re
@@ -207,6 +204,15 @@ def dict_to_css(css):
         items.append(key + ':' + val)
     return ';'.join(items)
 
+def add_class(text, cls):
+    "Add a CSS class to a space-separated list."
+    if text is None:
+        return cls
+    text = text.strip()
+    if not text:
+        return cls
+    return ' '.join(re.split(r'\s+', text) + [cls])
+
 def smart_float(num, decimals=5):
     return format(num, "." + str(decimals) + 'f').rstrip('0').rstrip('.')
 
@@ -224,19 +230,28 @@ class CSSClasses:
     It saves space to use css classes with short names for these.  This class
     acts as a repository for such css classes.
     """
+    ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
     def __init__(self):
         self.class_names = {}
         self.class_vals = {}
+    def _num_to_str(self, number):
+        if 0 <= number < len(self.ALPHABET):
+            return self.ALPHABET[number]
+        text = ''
+        while number != 0:
+            number, i = divmod(number, len(self.ALPHABET))
+            text = self.ALPHABET[i] + text
+        return text
     def get(self, val):
         if val in self.class_vals:
             return self.class_vals[val]
-        class_name = 'c' + b64_hash(val)[:4]
+        class_name = self._num_to_str(len(self.class_names))
         self.class_names[class_name] = val
         self.class_vals[val] = class_name
         return class_name
     def css(self, prefix):
-        return ''.join(prefix + '.' + name + '{' + val + '}'
-                       for name,val in self.class_names.items()) + '\n'
+        return ''.join(prefix + '.' + name + ' { ' + val + ' }\n'
+                       for name, val in sorted(self.class_names.items()))
 
 
 class HTMLDoc:
@@ -352,7 +367,8 @@ class HTMLDoc:
             contents += ''.join(pages)
             contents += r'\end{document}'
         # Now we know the hash file name
-        self.html_cache = os.path.join(self.cache_dir, b64_hash(contents))
+        self.contents_hash = b64_hash(contents)
+        self.html_cache = os.path.join(self.cache_dir, self.contents_hash)
         self.contents = contents
         return True
 
@@ -454,7 +470,7 @@ class HTMLDoc:
     def add_font(self, name, fname):
         with open(fname, 'rb') as fobj:
             self.fonts[name] = fobj.read()
-        self.font_hashes[name] = 'f'+b64_hash(self.fonts[name])[:4]
+        self.font_hashes[name] = 'f'+b64_hash(self.fonts[name])
 
     def write_cache(self, style, fonts, svgs):
         "Cache the computed data in an xml file"
@@ -507,16 +523,8 @@ class HTMLDoc:
                 svg.tail = tail_text
         elt.getparent().replace(elt, svg)
 
-    def use_cached(self, outfile):
-        "Write the cached output to the html file."
-        with open(self.html_cache, 'rb') as fobj:
-            cache = html.fromstring(fobj.read())
-        style = cache[0].text
-        fonts = cache[1].text
-        # Replace DOM elements
-        for elt in self.to_replace:
-            svg = cache[2]
-            self._replace_elt(elt, svg)
+    def _rewrite_common(self, style, fonts):
+        "Code common to use_cached() and write_html()."
         root = self.dom.getroot()
         try:
             root.get_element_by_id('pretex-style').text = style
@@ -529,6 +537,23 @@ class HTMLDoc:
         for elt in self.dom.getiterator('script'):
             if elt.attrib.get('type', '').startswith('text/x-latex-code-bare'):
                 elt.getparent().remove(elt)
+        # Add base class name to all immediate children of <body>.  These are
+        # the elements that are imported by the knowl mechanism.
+        base_class = 'C' + self.contents_hash
+        for elt in root.find('body'):
+            elt.attrib['class'] = add_class(elt.attrib.get('class'), base_class)
+
+    def use_cached(self, outfile):
+        "Write the cached output to the html file."
+        with open(self.html_cache, 'rb') as fobj:
+            cache = html.fromstring(fobj.read())
+        style = cache[0].text
+        fonts = cache[1].text
+        # Replace DOM elements
+        for elt in self.to_replace:
+            svg = cache[2]
+            self._replace_elt(elt, svg)
+        self._rewrite_common(style, fonts)
         with open(outfile, 'wb') as outf:
             outf.write(html.tostring(
                 self.dom, include_meta_content_type=True, encoding='utf-8'))
@@ -542,39 +567,31 @@ class HTMLDoc:
             cached_elts.append(svgs[i])
         style = PRETEX_STYLE
         style += r'''
-        svg.pretex text {{
-          {}
-        }}
-        svg.pretex path {{
-          {}
-        }}'''.format(
-            dict_to_css(self.DEFAULT_TEXT), dict_to_css(self.DEFAULT_PATH))
-        root = self.dom.getroot()
-        try:
-            root.get_element_by_id('pretex-style').text = style
-        except KeyError:
-            pass
+svg.pretex text {{
+  {}
+}}
+svg.pretex path {{
+  {}
+}}
+'''.format(dict_to_css(self.DEFAULT_TEXT), dict_to_css(self.DEFAULT_PATH))
         # Add fonts
-        font_style = ''
+        font_style = '\n/* pretex cache: {} */\n'.format(self.contents_hash)
         for name, data in self.fonts.items():
             name = self.font_hashes[name]
             font_style += r'''
-            @font-face {{
-              font-family: "{name}";
-              src: url(data:application/font-woff;base64,{data}) format('woff');
-            }}'''.format(name=name, data=b64encode(data).decode('ascii'))
+@font-face {{
+  font-family: "{name}";
+  src: url(data:application/font-woff;base64,{data}) format('woff');
+}}
+'''.format(name=name, data=b64encode(data).decode('ascii'))
+        font_style += '\n'
         # These go here so they show up in knowls too
-        font_style += self.tspan_classes.css('svg.pretex tspan')
-        font_style += self.path_classes.css('svg.pretex path')
-        font_style += ''.join('svg.pretex tspan.' + h + '{font-family:' + h + '}'
-                              for h in self.font_hashes.values())
-        try:
-            root.get_element_by_id('pretex-fonts').text = font_style
-        except KeyError:
-            pass
-        for elt in self.dom.getiterator('script'):
-            if elt.attrib.get('type', '').startswith('text/x-latex-code-bare'):
-                elt.getparent().remove(elt)
+        base_class = 'C' + self.contents_hash
+        font_style += self.tspan_classes.css(
+            '.{} svg.pretex tspan'.format(base_class))
+        font_style += self.path_classes.css(
+            '.{} svg.pretex path'.format(base_class))
+        self._rewrite_common(style, font_style)
         with open(outfile, 'wb') as outf:
             outf.write(html.tostring(
                 self.dom, include_meta_content_type=True, encoding='utf-8'))
@@ -700,36 +717,35 @@ class HTMLDoc:
         for key in self.DEFAULT_TEXT:
             if key in css and css[key] == self.DEFAULT_TEXT[key]:
                 del css[key]
-        # Add classes to save space
-        classes = []
-        if 'class' in tspan.attrib:
-            classes = tspan.attrib['class'].split(' ')
+        # Add css class to save space
+        css_val = []
         if 'font-size' in css:
-            match = re.match(r'([\d\.]+).*', css['font-size'])
-            size = float(match.group(1))
-            if abs(size - page_font_size) <= .001:
-                # It's using the default font size
-                del css['font-size']
-            else:
-                classes.append(self.tspan_classes.get(
-                    'font-size:'+css['font-size']))
-                del css['font-size']
-        # Replace font-family with a class (save space)
+            css_val.append('font-size:'+css['font-size'])
+            del css['font-size']
+        else:
+            # Shouldn't happen
+            print("WARNING: unspecified font-size in tspan")
         if 'font-family' in css:
             font_family = css['font-family'].split(',')
             if font_family and font_family[0]:
                 font_family = font_family[0]
                 if font_family in self.font_hashes:
-                    classes.append(self.font_hashes[font_family])
+                    css_val.append('font-family:'+self.font_hashes[font_family])
                 else:
-                    classes.append(self.tspan_classes.get(
-                        'font-family:'+font_family))
+                    # Shouldn't happen
+                    css_val.append('font-family:'+font_family)
                 del css['font-family']
+        else:
+            # Shouldn't happen
+            print("WARNING: unspecified font-family in tspan")
         tspan.attrib['style'] = dict_to_css(css)
         if not tspan.attrib['style']:
             del tspan.attrib['style']
-        if classes:
-            tspan.attrib['class'] = ' '.join(classes)
+        if css_val:
+            tspan.attrib['class'] = add_class(
+                tspan.attrib.get('class'),
+                self.tspan_classes.get(';'.join(css_val))
+            )
 
     def process_path(self, path):
         "Simplify <path> tag."
@@ -740,19 +756,23 @@ class HTMLDoc:
                 del css[key]
         if css.get('fill') == '#000000':
             css['fill'] = '#000'
-        # Add classes to save space
-        classes = []
-        if 'class' in path.attrib:
-            classes = path.attrib['class'].split(' ')
+        # Add class to save space
+        css_val = []
         if 'stroke-width' in css:
-            classes.append(self.path_classes.get(
-                'stroke-width:'+css['stroke-width']))
+            css_val.append('stroke-width:'+css['stroke-width'])
             del css['stroke-width']
+        else:
+            # Shouldn't happen.
+            # The default value is 1.
+            css_val.append('stroke-width:1')
         path.attrib['style'] = dict_to_css(css)
         if not path.attrib['style']:
             del path.attrib['style']
-        if classes:
-            path.attrib['class'] = ' '.join(classes)
+        if css_val:
+            path.attrib['class'] = add_class(
+                path.attrib.get('class'),
+                self.path_classes.get(';'.join(css_val))
+            )
 
     def process_image(self, img):
         "Simplify <image> tag."
