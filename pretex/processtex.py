@@ -521,6 +521,8 @@ class HTMLDoc:
                 svg = wrapper
             else:
                 svg.tail = tail_text
+        else:
+            svg.tail = elt.tail
         elt.getparent().replace(elt, svg)
 
     def _rewrite_common(self, style, fonts):
