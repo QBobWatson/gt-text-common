@@ -79,6 +79,10 @@ body, html body {
     vertical-align: middle;
 }
 
+.indexnav a {
+    width: 2.6ex;
+}
+
 #toc {
   pointer-events: initial;
 }
