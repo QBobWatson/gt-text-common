@@ -311,3 +311,38 @@ body, html body {
   color: red;
 }
 
+.searchwrapper {
+    max-width: 900px;
+    position: absolute;
+    right: 3px;
+    bottom: -3px; 
+    z-index: 1;
+    height: 0;
+    margin-bottom: 0;
+}
+
+.searchwrapper .cse .gsc-control-cse, .searchwrapper .gsc-control-cse  {
+    width: 27ex;
+}
+
+.searchwrapper .gsc-input-box
+{
+    height: 3.5ex;
+}
+
+.searchwrapper .gsc-search-button
+{
+    display: none;
+}
+
+.searchwrapper .gsc-input-box>table
+{
+    height: 100%;
+}
+
+.searchwrapper .gsc-input-box-hover,
+.searchwrapper .gsc-input-box:hover,
+.searchwrapper .gsc-input-box-focus
+{
+    box-shadow: none;
+}
