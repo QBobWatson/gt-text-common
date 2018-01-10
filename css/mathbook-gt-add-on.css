@@ -115,6 +115,13 @@ body, html body {
   display: inline-block;
 }
 
+.mathbook-content span.feedback-link {
+  font-size: 90%;
+  text-align: center;
+  width: 100%;
+  display: inline-block;
+}
+
 #toc {
   pointer-events: initial;
 }
