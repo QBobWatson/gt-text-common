@@ -83,6 +83,31 @@ body, html body {
     width: 2.6ex;
 }
 
+.mathbook-content .indexitem::after,
+.mathbook-content .subindexitem::after,
+.mathbook-content .subsubindexitem::after {
+    content: "";
+    clear: right;
+    display: table;
+}
+
+.mathbook-content .indexitem,
+.mathbook-content .subindexitem,
+.mathbook-content .subsubindexitem {
+  overflow: auto;
+}
+
+.mathbook-content .indexknowl {
+  margin-left: 0;
+  float: right;
+}
+
+.mathbook-content .indexknowl *[knowl],
+.mathbook-content .indexknowl *[knowl]:hover,
+.mathbook-content .indexknowl *[knowl].active {
+  margin-left: 1ex;
+}
+
 #toc {
   pointer-events: initial;
 }
