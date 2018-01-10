@@ -108,6 +108,13 @@ body, html body {
   margin-left: 1ex;
 }
 
+.mathbook-content a.feedback-link {
+  font-size: 110%;
+  text-align: center;
+  width: 100%;
+  display: inline-block;
+}
+
 #toc {
   pointer-events: initial;
 }
