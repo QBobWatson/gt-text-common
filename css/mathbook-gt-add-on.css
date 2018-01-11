@@ -174,7 +174,7 @@ a > article.remark-like:after {
   border: none;
 }
 
-.mathbook-content .warning-like {
+.mathbook-content .bluebox {
   padding: 1em;
   /*padding-bottom: 0;*/
   border: 3px solid #aaaaff;
@@ -182,25 +182,25 @@ a > article.remark-like:after {
   margin-bottom: 1.25em;
 }
 
-.mathbook-content .warning-like > .heading .type:last-child:after,
-.mathbook-content .warning-like > .heading .codenumber:last-child:after,
-.mathbook-content .warning-like > .heading .title:last-child:after
+.mathbook-content .bluebox > .heading .type:last-child:after,
+.mathbook-content .bluebox > .heading .codenumber:last-child:after,
+.mathbook-content .bluebox > .heading .title:last-child:after
 {
   content: ".\2009 ";
 }
-.mathbook-content .warning-like > .heading .type:after,
-.mathbook-content .warning-like > .heading .codenumber:after,
-.mathbook-content .warning-like > .heading .title:after 
+.mathbook-content .bluebox > .heading .type:after,
+.mathbook-content .bluebox > .heading .codenumber:after,
+.mathbook-content .bluebox > .heading .title:after 
 {
   content: " ";
 }
 
-.mathbook-content .warning-like > .heading {
+.mathbook-content .bluebox > .heading {
   margin: 0;
   margin-bottom: .5em;
 }
 
-.mathbook-content .warning-like > p:last-child {
+.mathbook-content .bluebox > p:last-child {
   margin: 0;
 }
 
@@ -311,6 +311,8 @@ body, html body {
   color: red;
 }
 
+/* JDR: Google search */
+
 .searchwrapper {
     max-width: 900px;
     position: absolute;
@@ -345,4 +347,22 @@ body, html body {
 .searchwrapper .gsc-input-box-focus
 {
     box-shadow: none;
+}
+
+/* JDR: PDF version */
+
+.pdf-version {
+  position: absolute;
+  right: 3px;
+  bottom: 39px;
+}
+
+.pdf-version a {
+  color: #aaaaaa;
+  font-family: "CharterBT";
+  text-decoration: none;
+}
+
+.pdf-version a:hover {
+  color: #eeb211;
 }
