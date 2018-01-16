@@ -388,16 +388,15 @@ body, html body {
 #cover-controls select,
 #cover-controls button {
   height: 28px;
-  margin-left: 10px;
-  padding: 3px;
+  width: 100px;
   font-size: 14px;
   color: #aaa;
   background-color: #fff;
-  border: 1px solid #ddd;
+  border: 1px solid #ccc;
 }
-#cover-controls button {
-  padding-left: 5px;
-  padding-right: 5px;
+
+#cover-controls select {
+  margin-left: 10px;
 }
 
 #mathbox-container {
