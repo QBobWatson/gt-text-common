@@ -366,3 +366,52 @@ body, html body {
 .pdf-version a:hover {
   color: #eeb211;
 }
+
+
+/* JDR: cover animation */
+
+#cover {
+  margin-bottom: 1.25em;
+  position: relative;
+}
+
+#cover-controls {
+  width:      100%;
+  text-align: center;
+  position:   absolute;
+  left:       0;
+  bottom:     5px;
+  z-index:    1;
+  opacity:    .7;
+}
+
+#cover-controls select,
+#cover-controls button {
+  height: 28px;
+  margin-left: 10px;
+  padding: 3px;
+  font-size: 14px;
+  color: #aaa;
+  background-color: #fff;
+  border: 1px solid #ddd;
+}
+#cover-controls button {
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mathbox-container {
+  width:       100%;
+  height:      0;
+  padding-top: 100%;
+  overflow:    hidden;
+  position:    relative;
+}
+
+#mathbox {
+  position: absolute;
+  top:      0;
+  left:     0;
+  width:    100%;
+  height:   100%;
+}
