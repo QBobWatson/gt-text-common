@@ -398,6 +398,14 @@ body, html body {
   color: #aaa;
   background-color: #fff;
   border: 1px solid #ccc;
+  transition: color .75s, background-color .75s, border-color .75s;
+}
+
+#cover-controls select:hover,
+#cover-controls button:hover {
+  color: #000;
+  background-color: #eee;
+  border-color: #000;
 }
 
 #cover-controls button {
