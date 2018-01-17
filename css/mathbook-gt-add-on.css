@@ -51,6 +51,7 @@ body, html body {
 
 #masthead #byline, #masthead .byline {
     margin-top: -.4em;
+    font-size: 1em;
 }
 
 #masthead.smallbuttons {
@@ -351,10 +352,14 @@ body, html body {
 
 /* JDR: PDF version */
 
+#masthead > .banner > .container {
+    position: relative
+}
+
 .pdf-version {
   position: absolute;
   right: 3px;
-  bottom: 39px;
+  bottom: -1em;
 }
 
 .pdf-version a {
