@@ -395,7 +395,7 @@ body, html body {
   border: 1px solid #ccc;
 }
 
-#cover-controls select {
+#cover-controls button {
   margin-left: 10px;
 }
 
