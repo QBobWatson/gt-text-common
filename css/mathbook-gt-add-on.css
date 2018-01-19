@@ -312,6 +312,10 @@ body, html body {
   color: red;
 }
 
+.mathbook-content .preface a[href^="mailto:"] {
+  font-size: 90%;
+}
+
 /* JDR: Google search */
 
 .searchwrapper {
