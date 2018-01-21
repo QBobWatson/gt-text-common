@@ -262,7 +262,7 @@ class HTMLDoc:
     SVG_ATTRS = set(['viewBox', 'height', 'width', 'version'])
 
     DEFAULT_TEXT = css_to_dict('''
-        writing-mode: lr-tb;
+        writing-mode: horizontal-tb;
         fill:         #000000;
         fill-rule:    nonzero;
         fill-opacity: 1;
@@ -719,6 +719,8 @@ svg.pretex path {{
         for key in self.DEFAULT_TEXT:
             if key in css and css[key] == self.DEFAULT_TEXT[key]:
                 del css[key]
+        if 'writing-mode' in css and css['writing-mode'] == 'lr-tb':
+            del css['writing-mode']
         # Add css class to save space
         css_val = []
         if 'font-size' in css:
@@ -761,12 +763,19 @@ svg.pretex path {{
         # Add class to save space
         css_val = []
         if 'stroke-width' in css:
-            css_val.append('stroke-width:'+css['stroke-width'])
+            swd = css['stroke-width']
+            # Append "px" to unitless numbers
+            try:
+                float(swd)
+            except ValueError:
+                pass
+            else:
+                swd = swd + 'px'
+            css_val.append('stroke-width:'+swd)
             del css['stroke-width']
         else:
-            # Shouldn't happen.
             # The default value is 1.
-            css_val.append('stroke-width:1')
+            css_val.append('stroke-width:1px')
         path.attrib['style'] = dict_to_css(css)
         if not path.attrib['style']:
             del path.attrib['style']
