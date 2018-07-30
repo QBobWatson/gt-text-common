@@ -4,7 +4,9 @@
 # Don't do this in processtex, to avoid crashes...
 
 import argparse
+import glob
 import os
+import sys
 
 from multiprocessing import Pool, cpu_count
 from random import shuffle
@@ -50,16 +52,19 @@ def main():
                         help='Ignore cache and regenerate')
     parser.add_argument('--chunk-size', type=int, default=50,
                         help='Run processtex on chunks of this size')
-    parser.add_argument('htmls', type=str, nargs='+',
-                        help='HTML files to process')
+    parser.add_argument('--build-dir', type=str, required=True,
+                        help='HTML build directory')
     args = parser.parse_args()
 
-    # Process in a random order.  Otherwise one process gets all the section files.
-    shuffle(args.htmls)
+    htmls = glob.glob(os.path.join(args.build_dir, '*.html')) + \
+            glob.glob(os.path.join(args.build_dir, 'knowl', '*.html'))
 
-    with Pool(processes=cpu_count()-1) as pool:
+    # Process in a random order.  Otherwise one process gets all the section files.
+    shuffle(htmls)
+
+    with Pool(processes=max(cpu_count()-1, 3)) as pool:
         job_args = []
-        for chunk in chunks(args.htmls, args.chunk_size):
+        for chunk in chunks(htmls, args.chunk_size):
             job_args.append((args, chunk))
         result = pool.map_async(
             job, job_args, error_callback=lambda x: pool.close())
