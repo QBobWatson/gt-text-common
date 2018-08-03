@@ -224,6 +224,10 @@ a > article.remark-like:after {
     margin-bottom: 1em;
 }
 
+.mathbook-content .knowl-output {
+  background: white;
+}
+
 /* JDR: No permalink for hidden subsection */
 .mathbook-content section.hidden-subsection header .heading a.permalink {
   display: none;
