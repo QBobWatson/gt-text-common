@@ -305,6 +305,14 @@ body, html body {
   font-weight: bold;
 }
 
+.mathbook-content .definition-like p > em {
+  font-weight: normal;
+}
+
+.mathbook-content .definition-like p > em.terminology {
+  font-weight: 800;
+}
+
 .mathbook-content .heading img.important {
   width: 1.5em;
   padding-right: .5em;
