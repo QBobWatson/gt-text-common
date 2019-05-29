@@ -523,7 +523,8 @@ class HTMLDoc:
                 svg.tail = tail_text
         else:
             svg.tail = elt.tail
-        elt.getparent().replace(elt, svg)
+        parent = elt.getparent()
+        parent.replace(elt, svg)
 
     def _rewrite_common(self, style, fonts):
         "Code common to use_cached() and write_html()."
@@ -538,7 +539,7 @@ class HTMLDoc:
             pass
         for elt in self.dom.getiterator('script'):
             if elt.attrib.get('type', '').startswith('text/x-latex-code-bare'):
-                elt.getparent().remove(elt)
+                elt.drop_tree()
         # Add base class name to all immediate children of <body>.  These are
         # the elements that are imported by the knowl mechanism.
         base_class = 'C' + self.contents_hash
@@ -615,11 +616,11 @@ svg.pretex path {{
             # Get rid of metadata
             metadata = svg.find('metadata')
             if metadata is not None:
-                svg.remove(metadata)
+                metadata.drop_tree()
             # Get rid of empty defs
             defs = svg.find('defs')
             if defs is not None and len(defs) == 0:
-                svg.remove(defs)
+                defs.drop_tree()
             # Undo global page coordinate transforms
             units_in_pt = unwrap_transforms(svg)
             # Plug in actual size data
@@ -664,7 +665,7 @@ svg.pretex path {{
                 todelete = []
                 for elt in todelete2:
                     parent = elt.getparent()
-                    parent.remove(elt)
+                    elt.drop_tree()
                     if parent.tag == 'g' and len(parent) == 0:
                         todelete.append(parent)
             if page_extents['display']:
@@ -898,7 +899,7 @@ def unwrap_transforms(svg):
             child.attrib.get('transform', ''), mat)
         child.attrib['transform'] = simpletransform.format_transform(child_mat)
         svg.append(child)
-    svg.remove(group)
+    group.drop_tree()
     simplify_transforms(svg)
     return True
 
