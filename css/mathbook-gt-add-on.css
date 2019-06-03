@@ -291,6 +291,13 @@ a > article.remark-like:after {
   text-align:  center;
   background:  #ddd;
   border-radius: 5px;
+  transition:  opacity .5s;
+  -webkit-transition: opacity .5s;
+}
+
+.mathbook-content .mathbox .maximizer:hover,
+.mathbook-content .mathbox .minimizer:hover {
+  opacity: .75;
 }
 
 .mathbook-content .mathbox.maximized .maximizer {
