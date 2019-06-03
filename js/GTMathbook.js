@@ -35,7 +35,6 @@
         var $content = $("#content");
         var $main = $("main.main").first();
         var $w = $(w);
-        var firstShow = true;
 
         var topNav = function() {
             return $bottomButtons.css("display") === "none";
@@ -62,11 +61,6 @@
                 $main.prepend($tocBorder);
             }
             $tocBorder.show();
-            if(firstShow) {
-                // MathJax has no idea how big hidden elements will be
-                MathJax.Hub.Queue(["Reprocess",MathJax.Hub,$tocBorder[0]]);
-                firstShow = false;
-            }
             // Mobile browsers resize often based on which UI elements are
             // present.  We don't want to re-scroll every time.
             if(resizeOnly) {return}
@@ -182,6 +176,40 @@
                 }
                 child.slideToggle(500);
             });
+
+        var maximize = function() {
+            var parent = $(this).parent();
+            var iframe = parent.children("iframe");
+            if(parent.hasClass("maximized")) {
+                parent.removeClass("maximized");
+                parent.css("height", parent.data("height"));
+
+                var iOS = !!navigator.platform &&
+                    /iPad|iPhone|iPod/.test(navigator.platform);
+                if(iOS) {
+                    // Hack for iOS
+                    iframe.remove();
+                    parent.prepend(iframe);
+                }
+            } else {
+                parent.data("height", parent.css("height"));
+                parent.css("height", "auto");
+                parent.addClass("maximized");
+            }
+        };
+
+        $(".mathbook-content .mathbox .maximizer")
+            .on("click", maximize);
+        $(".mathbook-content .mathbox .minimizer")
+            .on("click", maximize);
+
+        this.knowlLoaded = function(uid) {
+            $("#kuid-" + uid + " .mathbox .maximizer")
+                .on("click", maximize);
+            $("#kuid-" + uid + " .mathbox .minimizer")
+                .on("click", maximize);
+        };
+
     };
 
     // If script is run after page is loaded, initialize immediately
@@ -193,13 +221,6 @@
             w.mathbook = new Mathbook();
         });
     }
-
-    // MathJax is now precompiled, but knowl.js doesn't know that.
-    w.MathJax = {Hub: {Queue: function(cmd) {
-        if(cmd[0] instanceof Function) {
-            cmd[0]();
-        }
-    }}};
 
     return Mathbook;
 

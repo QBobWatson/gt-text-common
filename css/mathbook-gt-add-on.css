@@ -264,14 +264,45 @@ a > article.remark-like:after {
   z-index:      2;
 }
 
-.mathbook-content .mathbox iframe:hover {
-  margin-left: -50vw;
-  left:         50%;
-  width:        100vw;
-  height:       100vh;
-  max-height:   75vw;
-  border:       1px solid #ccc;
+.mathbook-content .mathbox {
+  position: relative;
 }
+
+.mathbook-content .mathbox.maximized {
+  position: fixed;
+  left:     0;
+  top:      0;
+  right:    0;
+  bottom:   0;
+  z-index:  205;
+}
+
+.mathbook-content .mathbox .maximizer,
+.mathbook-content .mathbox .minimizer {
+  position:    absolute;
+  right:       0px;
+  bottom:      0px;
+  z-index:     3;
+  font-family: "Ionicons";
+  cursor:      pointer;
+  opacity:     .5;
+  font-size:   40px;
+  width:       40px;
+  text-align:  center;
+  background:  #ddd;
+  border-radius: 5px;
+}
+
+.mathbook-content .mathbox.maximized .maximizer {
+  display: none;
+}
+.mathbook-content .mathbox .minimizer {
+  display: none;
+}
+.mathbook-content .mathbox.maximized .minimizer {
+  display: block;
+}
+
 
 body, html body {
   overflow-x: hidden;

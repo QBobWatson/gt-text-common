@@ -1,4 +1,4 @@
-/* 
+/*
  * Knowl - Feature Demo for Knowls
  * Copyright (C) 2011  Harald Schilly
  *
@@ -17,7 +17,7 @@
  *
  * 4/11/2012 Modified by David Guichard to allow inline knowl code.
  * Sample use:
- *      This is an <a knowl="" class="internal" 
+ *      This is an <a knowl="" class="internal"
  *      value="Hello World!">inline knowl.</a>
  */
 
@@ -26,8 +26,8 @@
  *
  * The syntax is <a knowl="" class="id-ref" refid="proofSS">Proof</a>
  */
- 
-/* javascript code for the knowl features 
+
+/* javascript code for the knowl features
  * global counter, used to uniquely identify each knowl-output element
  * that's necessary because the same knowl could be referenced several times
  * on the same page */
@@ -35,15 +35,15 @@ var knowl_id_counter = 0;
 
 var knowl_focus_stack_uid = [];
 var knowl_focus_stack = [];
- 
+
 function knowl_click_handler($el) {
   // the knowl attribute holds the id of the knowl
   var knowl_id = $el.attr("knowl");
   // the uid is necessary if we want to reference the same content several times
   var uid = $el.attr("knowl-uid");
-  var output_id = '#knowl-output-' + uid; 
+  var output_id = '#knowl-output-' + uid;
   var $output_id = $(output_id);
-  // create the element for the content, insert it after the one where the 
+  // create the element for the content, insert it after the one where the
   // knowl element is included (e.g. inside a <h1> tag) (sibling in DOM)
   var idtag = "id='"+output_id.substring(1) + "'";
   var kid   = "id='kuid-"+ uid + "'";
@@ -60,7 +60,7 @@ function knowl_click_handler($el) {
      }
 
      this_knowl_focus_stack_uidindex = knowl_focus_stack_uid.indexOf(uid);
-     
+
      if($el.hasClass("active")) {
        if(this_knowl_focus_stack_uidindex != -1) {
          knowl_focus_stack_uid.splice(this_knowl_focus_stack_uidindex, 1);
@@ -74,9 +74,9 @@ function knowl_click_handler($el) {
      }
 
      $el.toggleClass("active");
- 
+
   // otherwise download it or get it from the cache
-  } else { 
+  } else {
     // where_it_goes is the location the knowl will appear *after*
     // knowl is the variable that will hold the content of the output knowl
     var where_it_goes = $el;
@@ -91,7 +91,7 @@ function knowl_click_handler($el) {
         where_it_goes = $el;
     } else {
        // otherwise, typically put it after the nearest enclosing block element
-    
+
       // check, if the knowl is inside a td or th in a table
       if($el.parent().is("td") || $el.parent().is("th") ) {
         // assume we are in a td or th tag, go 2 levels up
@@ -100,7 +100,7 @@ function knowl_click_handler($el) {
         knowl = "<tr><td colspan='"+cols+"'>"+knowl+"</td></tr>";
       } else if ($el.parent().is("li")) {
         where_it_goes = $el.parent();
-      } 
+      }
       // not sure it is is worth making the following more elegant
       else if ($el.parent().parent().is("li")) {
         where_it_goes = $el.parent().parent();
@@ -124,8 +124,8 @@ function knowl_click_handler($el) {
     else {
         where_it_goes.after(knowl);
     }
- 
-    // "select" where the output is and get a hold of it 
+
+    // "select" where the output is and get a hold of it
     var $output = $(output_id);
     var $knowl = $("#kuid-"+uid);
     $output.addClass("loading");
@@ -141,7 +141,7 @@ function knowl_click_handler($el) {
     } else {
     // Get code from server.
     $output.load(knowl_id,
-     function(response, status, xhr) { 
+     function(response, status, xhr) {
        $knowl.removeClass("loading");
        if (status == "error") {
          $el.removeClass("active");
@@ -151,10 +151,9 @@ function knowl_click_handler($el) {
          $el.removeClass("active");
          $output.html("<div class='knowl-output error'>ERROR: timeout. " + xhr.status + " " + xhr.statusText + '</div>');
          $output.show();
-       }
-       else {
-           // this is sloppy, because this is called again later.
-              MathJax.Hub.Queue(['Typeset', MathJax.Hub, $output.get(0)]);
+       } else {
+         // Success
+         window.mathbook.knowlLoaded(uid);
     }
      });
     };
@@ -165,37 +164,13 @@ function knowl_click_handler($el) {
    $knowl.hide();
 
    $el.addClass("active");
- // if we are using MathJax, then we reveal the knowl after it has finished rendering the contents
-   if(window.MathJax == undefined) {
-            $knowl.slideDown("slow");
-   } else {
-     $knowl.addClass("processing");
-     MathJax.Hub.Queue(['Typeset', MathJax.Hub, $output.get(0)]);
-     MathJax.Hub.Queue([ function() {
-       $knowl.removeClass("processing");
-       $knowl.slideDown("slow");
-
-       // if replacing, then need to hide what was there
-       // (and also do some other things so that toggling works -- not implemented yet)
-       if($el.attr("replace")) {
-          var the_replaced_thing = $($el.attr("replace"));
-          the_replaced_thing.hide("slow");
-        }
-
-        var thisknowlid = 'kuid-'.concat(uid)
-        document.getElementById(thisknowlid).tabIndex=0;
-        document.getElementById(thisknowlid).focus();
-        knowl_focus_stack_uid.push(uid);
-        knowl_focus_stack.push($el);
-        $("a[knowl]").attr("href", "");
-        }]);
-      }
+   $knowl.slideDown("slow");
   }
 } //~~ end click handler for *[knowl] elements
 
-/** register a click handler for each element with the knowl attribute 
- * @see jquery's doc about 'live'! the handler function does the 
- *  download/show/hide magic. also add a unique ID, 
+/** register a click handler for each element with the knowl attribute
+ * @see jquery's doc about 'live'! the handler function does the
+ *  download/show/hide magic. also add a unique ID,
  *  necessary when the same reference is used several times. */
 $(function() {
     $("body").on("click", "*[knowl]", function(evt) {
